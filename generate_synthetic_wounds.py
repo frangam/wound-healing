@@ -31,7 +31,7 @@ def generate_wound_dataframe(cell_types, seed_left, seed_right, seed_high, IMG_W
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    p.add_argument('--n', type=int, default=5, help='the number of wounds to generate')
+    p.add_argument('--n', type=int, default=10, help='the number of wounds to generate')
     p.add_argument('--w', type=int, default=1000, help='the image width')
     p.add_argument('--h', type=int, default=1000, help='the image height')
     args = p.parse_args()
@@ -52,27 +52,71 @@ def main():
 
     print('Initial values:', seed_left, seed_right, seed_high)
 
-        # Generate wounds
-    monolayer_wounds = generate_wound(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
-    sphere_wounds = generate_wound(SPHERES, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
 
-    # Generate wounds and create DataFrames
-    monolayer_df = generate_wound_dataframe(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
-    spheres_df = generate_wound_dataframe(SPHERES, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
+    ## Generar múltiples heridas de tipo monolayer y sphere
+    num_wounds = args.n
 
-    # Combine DataFrames into a single DataFrame
-    combined_df = pd.concat([monolayer_df, spheres_df], axis=1)
+    monolayer_wound_lists = [generate_wound(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT) for _ in range(num_wounds)]
+    sphere_wound_lists = [generate_wound(SPHERES, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT) for _ in range(num_wounds)]
 
-    # Save combined DataFrame to CSV file
+    # Crear una lista para almacenar los DataFrames de heridas
+    wound_df_list = []
+
+    # Generar DataFrames para las heridas y asignar ID y tipo de célula en cada iteración
+    for i in range(num_wounds):
+        monolayer_wounds = monolayer_wound_lists[i]
+        sphere_wounds = sphere_wound_lists[i]
+        
+        monolayer_df = generate_wound_dataframe(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
+        sphere_df = generate_wound_dataframe(SPHERES, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
+        
+        # Asignar ID y tipo de célula en los DataFrames
+        monolayer_df['ID'] = f'Monolayer_{i+1}'
+        monolayer_df['CellType'] = 0
+        
+        sphere_df['ID'] = f'Sphere_{i+1}'
+        sphere_df['CellType'] = 1
+        
+        # Agregar los DataFrames a la lista
+        wound_df_list.append(monolayer_df)
+        wound_df_list.append(sphere_df)
+
+        # Generar videos y guardar los frames
+        monolayer_video_name = f"demo/monolayer/monolayer_video_{i+1}.mp4"
+        monolayer_image_folder = f"demo/monolayer/frames_{i+1}"
+        generate_video(monolayer_wounds, monolayer_video_name, monolayer_image_folder, IMG_WIDTH, IMG_HEIGHT)
+        
+        sphere_video_name = f"demo/spheres/sphere_video_{i+1}.mp4"
+        sphere_image_folder = f"demo/spheres/frames_{i+1}"
+        generate_video(sphere_wounds, sphere_video_name, sphere_image_folder, IMG_WIDTH, IMG_HEIGHT)
+
+    # Combinar los DataFrames de heridas en un solo DataFrame
+    combined_df = pd.concat(wound_df_list, ignore_index=True)
+
+    # Guardar el DataFrame combinado en un archivo CSV
     combined_df.to_csv("demo/combined_wounds.csv", index=False)
+
+
+
 
     # Print shape of the combined DataFrame
     print("Shape of the combined DataFrame:", combined_df.shape)
 
 
-    # Generate videos
-    generate_video(monolayer_wounds, "demo/monolayer/monolayer_video.mp4", "demo/monolayer/", IMG_WIDTH, IMG_HEIGHT)
-    generate_video(sphere_wounds, "demo/spheres/sphere_video.mp4", "demo/spheres/", IMG_WIDTH, IMG_HEIGHT)
+    # # # Generate videos
+    # # generate_video(monolayer_wounds, "demo/monolayer/monolayer_video.mp4", "demo/monolayer/", IMG_WIDTH, IMG_HEIGHT)
+    # # generate_video(sphere_wounds, "demo/spheres/sphere_video.mp4", "demo/spheres/", IMG_WIDTH, IMG_HEIGHT)
+    # for i, row in combined_df.iterrows():
+    #     print(row)
+    #     monolayer_wound = row['WoundMatrix_0']  # Obtener la herida del tipo monolayer en el instante i
+    #     sphere_wound = row['WoundMatrix_1']  # Obtener la herida del tipo spheres en el instante i
+    #     print(monolayer_wound)
+
+    #     # Generar el video para la herida monolayer en el instante i
+    #     generate_video([monolayer_wound], f"demo/combined/monolayer_video_{i}.mp4", "demo/combined/monolayer_frames/", IMG_WIDTH, IMG_HEIGHT)
+
+    #     # Generar el video para la herida spheres en el instante i
+    #     generate_video([sphere_wound], f"demo/combined/sphere_video_{i}.mp4", "demo/combined/sphere_frames/", IMG_WIDTH, IMG_HEIGHT)
 
 
 if __name__ == '__main__':
