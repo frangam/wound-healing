@@ -1,41 +1,35 @@
 #!venv/bin/python3
+
+"""
+Contains functions for generating synthetic wound creation and healing.
+
+(c) All rights reserved.
+original authors: Francisco M. Garcia-Moreno, Miguel Ángel Gutiérrez-Naranjo. 2023.
+
+Source code:
+https://github.com/frangam/wound-healing
+
+Please see LICENSE.md for the full license document:
+https://github.com/frangam/wound-healing/LICENSE.md
+"""
+
 import argparse
 import numpy as np
 import pandas as pd
 import os
-from woundhealing.synthetic import generate_wound, generate_video
 
-def generate_wound_dataframe(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000, IMG_HEIGHT=1000):
-    """
-    Generates a DataFrame with the wounds at each step of the healing process.
-
-    Args:
-        cell_types (list): The list of cell types.
-        seed_left (int): Initial left edge of the wound.
-        seed_right (int): Initial right edge of the wound.
-        seed_high (int): Initial height of the wound.
-        IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
-        IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
-
-    Returns:
-        pandas.DataFrame: A DataFrame containing the wounds at each step of the healing process.
-    """
-    wounds = generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
-
-    df = pd.DataFrame()
-    for i, wound in enumerate(wounds):
-        df[f'WoundMatrix_{i}'] = [wound]
-
-    return df
+import woundhealing as W
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    p.add_argument('--n', type=int, default=10, help='the number of wounds to generate')
+    p.add_argument('--gpu-id', type=int, default=1, help='the GPU device ID')
+    p.add_argument('--n', type=int, default=100, help='the number of wounds to generate')
     p.add_argument('--w', type=int, default=1000, help='the image width')
     p.add_argument('--h', type=int, default=1000, help='the image height')
     args = p.parse_args()
 
+    W.utils.set_gpu(args.gpu_id)
     os.makedirs("demo", exist_ok=True)
 
 
@@ -56,8 +50,8 @@ def main():
     ## Generar múltiples heridas de tipo monolayer y sphere
     num_wounds = args.n
 
-    monolayer_wound_lists = [generate_wound(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT) for _ in range(num_wounds)]
-    sphere_wound_lists = [generate_wound(SPHERES, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT) for _ in range(num_wounds)]
+    monolayer_wound_lists = [W.synthetic.generate_wound(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT) for _ in range(num_wounds)]
+    sphere_wound_lists = [W.synthetic.generate_wound(SPHERES, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT) for _ in range(num_wounds)]
 
     # Crear una lista para almacenar los DataFrames de heridas
     wound_df_list = []
@@ -67,8 +61,8 @@ def main():
         monolayer_wounds = monolayer_wound_lists[i]
         sphere_wounds = sphere_wound_lists[i]
         
-        monolayer_df = generate_wound_dataframe(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
-        sphere_df = generate_wound_dataframe(SPHERES, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
+        monolayer_df = W.synthetic.generate_wound_dataframe(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
+        sphere_df = W.synthetic.generate_wound_dataframe(SPHERES, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
         
         # Asignar ID y tipo de célula en los DataFrames
         monolayer_df['ID'] = f'Monolayer_{i+1}'
@@ -84,11 +78,11 @@ def main():
         # Generar videos y guardar los frames
         monolayer_video_name = f"demo/monolayer/monolayer_video_{i+1}.mp4"
         monolayer_image_folder = f"demo/monolayer/frames_{i+1}"
-        generate_video(monolayer_wounds, monolayer_video_name, monolayer_image_folder, IMG_WIDTH, IMG_HEIGHT)
+        W.synthetic.generate_video(monolayer_wounds, monolayer_video_name, monolayer_image_folder, IMG_WIDTH, IMG_HEIGHT)
         
         sphere_video_name = f"demo/spheres/sphere_video_{i+1}.mp4"
         sphere_image_folder = f"demo/spheres/frames_{i+1}"
-        generate_video(sphere_wounds, sphere_video_name, sphere_image_folder, IMG_WIDTH, IMG_HEIGHT)
+        W.synthetic.generate_video(sphere_wounds, sphere_video_name, sphere_image_folder, IMG_WIDTH, IMG_HEIGHT)
 
     # Combinar los DataFrames de heridas en un solo DataFrame
     combined_df = pd.concat(wound_df_list, ignore_index=True)
@@ -96,6 +90,7 @@ def main():
     # Guardar el DataFrame combinado en un archivo CSV
     combined_df.to_csv("demo/combined_wounds.csv", index=False)
 
+    print(combined_df)
 
 
 

@@ -1,5 +1,5 @@
 """
-wound_healing.py: Contains functions for simulating wound creation and healing.
+Contains functions for simulating wound creation and healing.
 
 (c) All rights reserved.
 original authors: Francisco M. Garcia-Moreno, Miguel Ángel Gutiérrez-Naranjo. 2023.
@@ -13,6 +13,7 @@ https://github.com/frangam/wound-healing/LICENSE.md
 
 import os
 import numpy as np
+import pandas as pd
 import cv2
 
 
@@ -120,7 +121,8 @@ def draw_wound(wound, IMG_WIDTH=1000, IMG_HEIGHT=1000):
 
     return img_rgb
 
-def generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000, IMG_HEIGHT=1000, max_jump_initial=3, min_jump_final=1, closing_jump=2, closing_start=1):
+
+def generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.3):
     """
     Generates a wound and simulates its healing process.
 
@@ -131,10 +133,6 @@ def generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000,
         seed_high (int): Initial height of the wound.
         IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
         IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
-        max_jump_initial (int, optional): Maximum initial jump. Defaults to 3.
-        min_jump_final (int, optional): Minimum final jump. Defaults to 1.
-        closing_jump (int, optional): Closing jump. Defaults to 2.
-        closing_start (int, optional): The start of the closing process. Defaults to 1.
 
     Returns:
         list: A list of wounds at each step of the healing process.
@@ -142,39 +140,38 @@ def generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000,
     l, r = seed_left, seed_right
     wound_0 = expand(l, r, seed_high, IMG_WIDTH, IMG_HEIGHT)
     wounds = [wound_0]
-    closing_rate = 1 / (len(cell_types) - closing_start)  # Gradual closing rate
-    initial_width = r - l  # Initial wound width
-    is_closed = False  # Variable to control if the wound is closed
+    num_intervals = len(cell_types) - 1
+    width_reduction_ratio = width_reduction** (1 / num_intervals)  # Ratio for reducing width in each interval
 
     for i in range(1, len(cell_types)):
-        is_first_half = i < (len(cell_types) // 2)
-        if l < r and i != len(cell_types) - 1:
-            jump = max_jump_initial if is_first_half else min_jump_final
+        if l < r:
+            jump = 1
             high = min(jump, max(1, r - l)) + 1
             l += np.random.randint(1, high)
 
-        if r > l and i != len(cell_types) - 1:
-            jump = max_jump_initial if is_first_half else min_jump_final
+        if r > l:
+            jump = 1
             high = min(jump, max(1, r - l)) + 1
             r -= np.random.randint(1, high)
 
-        if i >= closing_start and not is_closed:  # Check if the wound is closed before applying gradual closing
-            if l >= r:
-                is_closed = True
-            else:
-                closing_progress = (i - closing_start) * closing_rate
-                closing_factor = 1 - closing_progress**2  # Closing width reduction factor
-                new_width = int(initial_width * closing_factor)  # New wound width
-                center = (l + r) // 2  # Current wound center
-                l = center - new_width // 2  # Update left side
-                r = center + new_width // 2  # Update right side
-
         if i == len(cell_types) - 1:
             l, r = (l + r) // 2, (l + r) // 2
+        else:
+            new_width = int((r - l) * width_reduction_ratio)
+            center = (l + r) // 2
+            l = center - new_width // 2
+            r = center + new_width // 2
+
         wound_i = expand(l, r, seed_high, IMG_WIDTH, IMG_HEIGHT)
         wounds.append(wound_i)
 
     return wounds
+
+
+
+
+
+
 
 def generate_video(wounds, video_name, image_folder, IMG_WIDTH=1000, IMG_HEIGHT=1000):
     """
@@ -211,3 +208,28 @@ def generate_video(wounds, video_name, image_folder, IMG_WIDTH=1000, IMG_HEIGHT=
 
     # Release the resources
     video.release()
+
+
+
+def generate_wound_dataframe(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000, IMG_HEIGHT=1000):
+    """
+    Generates a DataFrame with the wounds at each step of the healing process.
+
+    Args:
+        cell_types (list): The list of cell types.
+        seed_left (int): Initial left edge of the wound.
+        seed_right (int): Initial right edge of the wound.
+        seed_high (int): Initial height of the wound.
+        IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
+        IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
+
+    Returns:
+        pandas.DataFrame: A DataFrame containing the wounds at each step of the healing process.
+    """
+    wounds = generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
+
+    df = pd.DataFrame()
+    for i, wound in enumerate(wounds):
+        df[f'WoundMatrix_{i}'] = [wound]
+
+    return df
