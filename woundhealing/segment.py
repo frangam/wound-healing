@@ -49,22 +49,37 @@ def show_anns(anns):
         img[m] = color_mask
     ax.imshow(img)
 
-def get_mask_image(mask, random_color=False, alpha=True):
-    if random_color:
-        if alpha:
-          color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-        else:
-          color = np.concatenate([np.random.random(3)], axis=0)
-    else:
-        if alpha:
-          color = np.array([30/255, 144/255, 255/255, 0.6])
-        else:
-          color = np.array([30/255, 144/255, 255/255])
+# def get_mask_image(mask, random_color=False, alpha=True):
+#     if random_color:
+#         if alpha:
+#           color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+#         else:
+#           color = np.concatenate([np.random.random(3)], axis=0)
+#     else:
+#         if alpha:
+#           color = np.array([30/255, 144/255, 255/255, 0.6])
+#         else:
+#           color = np.array([30/255, 144/255, 255/255])
    
+#     h, w = mask.shape[-2:]
+
+#     print("mask.shape before reshape:", mask.shape)
+
+#     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+#     return mask_image
+
+def get_mask_image(mask, random_color=False, alpha=True):
     h, w = mask.shape[-2:]
-
-    print("mask.shape before reshape:", mask.shape)
-
+    if random_color:
+        # Mantener el código original para generar un color aleatorio
+        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+    else:
+        # Cambiar el color a blanco (1.0 en todos los canales)
+        if alpha:
+            color = np.array([1.0, 1.0, 1.0, 0.6])
+        else:
+            color = np.array([1.0, 1.0, 1.0])
+   
     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
     return mask_image
 

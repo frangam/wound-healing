@@ -1,1 +1,1 @@
-from . import synthetic, segment, utils, dataset, model
+from . import synthetic, segment, utils, dataset, model, fid_score

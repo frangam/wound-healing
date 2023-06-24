@@ -18,16 +18,20 @@ import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+from PIL import Image
 import cv2
+import pickle
 from tqdm import tqdm
 
 
+
 from woundhealing.synthetic import draw_wound
-from woundhealing.segment import setup_sam, predict_masks, get_area_perimeter, show_mask, show_points
+from woundhealing.segment import setup_sam, predict_masks, get_area_perimeter, show_mask, show_points, get_mask_image
 from woundhealing.utils import set_gpu
 
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-p.add_argument('--gpu-id', type=int, default=1, help='the GPU device ID')
+p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
 p.add_argument('--use-real', type=int, default=0, help='to use real data (1) or synthetic (0)')
 p.add_argument('--pixel-size', type=float, default=3.2, help='the pixel size of your microscope camera')
 
@@ -42,25 +46,37 @@ model_type = "vit_h"
 device = "cuda"
 
 # Directorio para guardar las segmentaciones
-segmentation_folder = "demo/segmentations/" if USE_SYNTHETIC else "demo/real_segmentations/"
+segmentation_folder = "data/segmentations/" if USE_SYNTHETIC else "data/real_segmentations/"
 
-# Leer el DataFrame desde el archivo CSV
-df = pd.read_csv("demo/combined_wounds.csv") if USE_SYNTHETIC else pd.read_csv("demo/real_combined_wounds.csv")
-# print(df.head())
-# print(df.shape)
+# Leer el DataFrame desde el archivo CSV o pickle
+if USE_SYNTHETIC:
+    df = pd.read_csv("data/combined_synth_wounds.csv")
+    herida_0 = np.array(df.head(1).loc[0, "WoundMatrix_0"])
+    herida_0 = np.array(eval(herida_0)) #convert to list
+    herida_0 = draw_wound(herida_0) #TODO cchange for the segmented image
+    image_size = herida_0.shape
+else:
+    with open("data/combined_real_wounds.pkl", "rb") as file:
+        df = pickle.load(file)
+    image_bytes = df.loc[0, "WoundMatrix_0"]
+    image_array = pickle.loads(image_bytes)
+    image_size = image_array.shape[:2]
+    print("image_size", image_size)
+
+    # height, width = 1532, 2048
+    # herida_0 = np.frombuffer(image_bytes, dtype=np.uint8).reshape((height, width, 3))
+
+
+print("df shape", df.shape)
+print("herida_0 shape", image_size)
 
 # setup SAM
 mask_generator, predictor = setup_sam(sam_checkpoint, model_type, device)
 
-herida_0 = df.head(1).loc[0, "WoundMatrix_0"]
-herida_0 = np.array(eval(herida_0)) #convert to list
-
-if USE_SYNTHETIC:
-    herida_0 = draw_wound(herida_0) #TODO cchange for the segmented image
-
-includes = [herida_0.shape[1]//2, herida_0.shape[0]//2]
-exclude_left = [herida_0.shape[1]//6, herida_0.shape[0]//2]
-exclude_right = [herida_0.shape[1] - herida_0.shape[1]//6, herida_0.shape[0]//2]
+   
+includes = [image_size[1]//2,image_size[0]//2]
+exclude_left = [image_size[1]//6, image_size[0]//2]
+exclude_right = [image_size[1] - image_size[1]//6, image_size[0]//2]
 input_point = np.array([includes, exclude_left, exclude_right])
 input_label = np.array([1, 0, 0]) #1 include, 0 exclude
 
@@ -74,27 +90,28 @@ new_perimeters = []
 for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
     cell_type = row['CellType']
     cell_id = row['ID']
-    seg_path = f"{segmentation_folder}{cell_id}/"
+    seg_path = f"{segmentation_folder}{cell_id.split('_')[0]}/{cell_id}/"
     os.makedirs(seg_path, exist_ok=True)
 
-    for t, column in enumerate(df.columns):
+    for t, column in tqdm(enumerate(df.columns), total=len(df.columns), desc='Generating masks...'):
         if column.startswith('WoundMatrix_'): #wounds in a time step t=i; WoundMatrix_0 (t=0); WoundMatrix_1 (t=1)...
             # print("row", row)
             wound_matrix = row[column] #it is a str like this: "[(250, 743, 0), (250, 742, 1), (250, 743, 2), ...]"
             if not pd.isna(wound_matrix):
-               
-                wound_matrix = eval(wound_matrix) #convert to list
-                image_array = np.array(wound_matrix)#, dtype=np.uint8)
-
                 if USE_SYNTHETIC:
-                    image_array = draw_wound(image_array) #TODO cchange for the segmented iamge
+                    wound_matrix = eval(wound_matrix) #convert to list
+                    image_array = np.array(wound_matrix, dtype=np.uint8)
+                else:    
+                    image_array = pickle.loads(wound_matrix)
 
-                print("shape", image_array.shape)
+                # print("image_array shape", image_array.shape)
 
                 # Segmentation...
                 # areas, perimeters = generar_segmentacion_herida(image_array, sam_checkpoint, model_type, device)
                 masks, scores, logits = predict_masks(predictor, image_array, input_point, input_label)
                 area, perimeter = get_area_perimeter(image_array, args.pixel_size)
+
+                print("len mask:", len(masks))
 
                 new_ids.append(cell_id)
                 new_cell_types.append(cell_type)
@@ -103,15 +120,56 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                 new_perimeters.append(perimeter)  # Asegúrate de que `perimeters` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
 
                 
-                cv2.imwrite(os.path.join(seg_path, f"{cell_id}_type_{cell_type}_complete_image_{t+1}.png"), image_array)
+                #save original image
+                path1 = f"{seg_path}/original/"
+                os.makedirs(path1, exist_ok=True)
+                cv2.imwrite(os.path.join(path1, f"{cell_id}_type_{cell_type}_complete_image_{t+1}.png"), image_array)
                 # cv2.imwrite(os.path.join(seg_path, f"{cell_id}_type_{cell_type}_segmentation_{t+1}.png"), masks)
 
-                plt.figure(figsize=(4,4))
-                plt.imshow(image_array)
-                show_mask(masks, plt.gca())
+                #segmentations showing points
+                path2 = f"{seg_path}/points/"
+                os.makedirs(path2, exist_ok=True)
+                fig, ax = plt.subplots(figsize=(4, 4))
+                ax.imshow(image_array)
+                show_mask(masks, ax)
                 show_points(input_point, input_label, plt.gca())
-                plt.axis('off')
-                plt.savefig(os.path.join(seg_path, f"{cell_id}_type_{cell_type}_segmentation_{t+1}.png"))
+                ax.axis('off')
+                ax.set_xlim([0, image_array.shape[1]])
+                ax.set_ylim([image_array.shape[0], 0])
+                plt.savefig(os.path.join(path2, f"{cell_id}_type_{cell_type}_segmentation_points_{t+1}.png"), bbox_inches='tight', pad_inches=0)
+                plt.close(fig)
+
+                #RGB segmentation
+                path3 = f"{seg_path}/rgb/"
+                os.makedirs(path3, exist_ok=True)
+                fig, ax = plt.subplots(figsize=(4, 4))
+                ax.imshow(image_array)
+                show_mask(masks, ax)
+                ax.axis('off')
+                ax.set_xlim([0, image_array.shape[1]])
+                ax.set_ylim([image_array.shape[0], 0])
+                plt.savefig(os.path.join(path3, f"{cell_id}_type_{cell_type}_segmentation_combined_{t+1}.png"), bbox_inches='tight', pad_inches=0)
+                plt.close(fig)
+
+                #grayscale
+                path4 = f"{seg_path}/gray/"
+                os.makedirs(path4, exist_ok=True)
+                fig, ax = plt.subplots(figsize=(4, 4))
+                # ax.imshow(image_array, cmap='gray')  # Convertir la imagen a escala de grises
+                mask_image = get_mask_image(masks, plt.gca(), alpha=False)
+                mask_gray = cv2.normalize(src=mask_image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+                img_uint8 = mask_gray.astype(np.uint8)
+                imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
+                mask_gray = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
+                # mask_gray = np.ones_like(masks) * 255  # Máscara completamente blanca
+
+                ax.imshow(mask_gray, cmap='gray')  # Convertir la imagen a escala de grises
+                ax.axis('off')
+                ax.set_xlim([0, image_array.shape[1]])
+                ax.set_ylim([image_array.shape[0], 0])
+                plt.savefig(os.path.join(path4, f"{cell_id}_type_{cell_type}_segmentation_{t+1}.png"), bbox_inches='tight', pad_inches=0)
+                plt.close(fig)
+
 
 
                 # plt.figure(figsize=(4,2))
@@ -126,8 +184,8 @@ new_df = pd.DataFrame({
     'Perimeter': new_perimeters
 })
 
-os.makedirs("data/", exist_ok=True)
-dir = f'data/synthetic.csv' if USE_SYNTHETIC else f'data/real_synthetic.csv'
+os.makedirs("results/", exist_ok=True)
+dir = f'results/synthetic_segments.csv' if USE_SYNTHETIC else f'results/real_synthetic_segments.csv'
 new_df.to_csv(dir, index=False)
 # print(new_df)
 

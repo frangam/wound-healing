@@ -139,6 +139,7 @@ def generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000,
     """
     l, r = seed_left, seed_right
     wound_0 = expand(l, r, seed_high, IMG_WIDTH, IMG_HEIGHT)
+    print("wound_0 shape", np.array(wound_0).shape)
     wounds = [wound_0]
     num_intervals = len(cell_types) - 1
     width_reduction_ratio = width_reduction** (1 / num_intervals)  # Ratio for reducing width in each interval
@@ -164,6 +165,7 @@ def generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000,
 
         wound_i = expand(l, r, seed_high, IMG_WIDTH, IMG_HEIGHT)
         wounds.append(wound_i)
+    print("wounds shape", np.array(wounds).shape)
 
     return wounds
 

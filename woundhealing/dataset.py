@@ -17,48 +17,72 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from tqdm import tqdm
 
 
-def load_images(base_dir='demo/', image_type='monolayer', remove_first_frame=False, resize_width=None, resize_height=None):
+def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_frame=False, resize_width=None, resize_height=None, remove_types=['synth_monolayer', 'real_monolayer']):
     """
     Load a dataset of images from specified directories.
 
-    This function reads image data from directories of a specified type, 
-    within a base directory. It can also optionally remove the first frame 
+    This function reads image data from directories of a specified type,
+    within a base directory. It can also optionally remove the first frame
     from the 'monolayer' type images. Images are returned as a numpy array.
 
     Parameters:
-    base_dir (str): The base directory from which to read image data. 
-                    Defaults to 'demo/'.
-    image_type (str): The type of images to load. This should correspond 
-                      to a subdirectory within the base directory. 
-                      Choices are 'monolayer' or 'spheres'. 
-                      Defaults to 'monolayer'.
-    remove_first_frame (bool): Whether to remove the first frame from the 
+    base_dir (str): The base directory from which to read image data.
+                    Defaults to 'data/'.
+    image_type (str): The type of images to load. This should correspond
+                      to a subdirectory within the base directory.
+                      Choices are 'synth_monolayer', 'synth_spheres', 'real_monolayer', 'real_spheres'.
+                      Defaults to 'synth_monolayer'.
+    remove_first_frame (bool): Whether to remove the first frame from the
                                'monolayer' images. Defaults to False.
-    resize_width (int): The desired width for resizing the images. 
+    resize_width (int): The desired width for resizing the images.
                         Defaults to None (no resizing).
-    resize_height (int): The desired height for resizing the images. 
+    resize_height (int): The desired height for resizing the images.
                          Defaults to None (no resizing).
+    remove_types (list): A list of image types that should have the first frame removed.
+                            Defaults to ['synth_monolayer', 'real_monolayer'].
 
     Returns:
     np.array: A numpy array of the loaded and resized images.
     """
     all_images = []
-    frame_dirs = [d for d in os.listdir(os.path.join(base_dir, image_type)) if 'frames_' in d]
-    frame_dirs.sort(key=lambda x: int(x.split('_')[1])) # Sort directories in order
+    # frame_dirs = [d for d in os.listdir(os.path.join(base_dir, image_type)) if 'frames_' in d]
+    # frame_dirs.sort(key=lambda x: int(x.split('_')[1])) # Sort directories in order
 
-    for dir in frame_dirs:
+    initial_frame_path = os.path.join(base_dir, image_type)
+    if image_type.startswith('synth'):
+        frame_dirs = [d for d in os.listdir(initial_frame_path) if 'frames_' in d]
+        frame_dirs.sort(key=lambda x: int(x.split('_')[1]))  # Sort directories in order
+    elif image_type.startswith('real_monolayer'):
+        initial_frame_path = os.path.join(base_dir, "real_segmentations/Monolayer/")
+        frame_dirs = [d for d in os.listdir(initial_frame_path) if d.startswith('Monolayer_')]
+        frame_dirs.sort(key=lambda x: int(x.split('_')[1][1:]) if x.split('_')[1][1:].isdigit() else float('inf'))
+    elif image_type.startswith('real_spheres'):
+        initial_frame_path = os.path.join(base_dir, "real_segmentations/Sphere/")
+        frame_dirs = [d for d in os.listdir(initial_frame_path) if d.startswith('Sphere_')]
+        frame_dirs.sort()  # Sort directories in order
+    
+    print("initial_frame_path", initial_frame_path)
+    print("frame_dirs", frame_dirs)
+
+    for dir in tqdm(frame_dirs, desc='Loading frames'):
         frame_images = []  # List to hold images of a single frame sequence
-        frame_path = os.path.join(base_dir, image_type, dir)
+        if image_type.startswith('real'):
+            frame_path = os.path.join(initial_frame_path, dir, "gray")
+        else:
+            frame_path = os.path.join(initial_frame_path, dir)
+
         frame_files = os.listdir(frame_path)
-        print(frame_files)
+
+        # print(frame_files)
         frame_files.sort(key=lambda x: int(x.split('.')[0].split('_')[1])) # Sort frame files in order
 
-        if remove_first_frame and (image_type == 'monolayer' or image_type == 'real_monolayer'):
+        if remove_first_frame and image_type in remove_types:
             frame_files = frame_files[1:] # Remove the first frame if the condition is met
 
-        for file in frame_files:
+        for file in tqdm(frame_files, desc='Loading images', leave=False):
             image = cv2.imread(os.path.join(frame_path, file))
             # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # Convert to grayscale          
             # image = cv2.normalize(src=image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)

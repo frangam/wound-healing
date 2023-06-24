@@ -19,19 +19,19 @@ import pandas as pd
 import os
 
 import woundhealing as W
+from tqdm import tqdm
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    p.add_argument('--gpu-id', type=int, default=1, help='the GPU device ID')
-    p.add_argument('--n', type=int, default=100, help='the number of wounds to generate')
-    p.add_argument('--w', type=int, default=1000, help='the image width')
-    p.add_argument('--h', type=int, default=1000, help='the image height')
+    p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
+    p.add_argument('--n', type=int, default=10000, help='the number of wounds to generate')
+    p.add_argument('--w', type=int, default=1024, help='the image width')
+    p.add_argument('--h', type=int, default=1024, help='the image height')
     args = p.parse_args()
 
     W.utils.set_gpu(args.gpu_id)
     os.makedirs("demo", exist_ok=True)
-
 
     IMG_WIDTH = args.w
     IMG_HEIGHT = args.h
@@ -57,8 +57,9 @@ def main():
     wound_df_list = []
 
     # Generar DataFrames para las heridas y asignar ID y tipo de célula en cada iteración
-    for i in range(num_wounds):
+    for i in tqdm(range(len(monolayer_wound_lists))):        
         monolayer_wounds = monolayer_wound_lists[i]
+        print("image shape", np.array(monolayer_wounds).shape)
         sphere_wounds = sphere_wound_lists[i]
         
         monolayer_df = W.synthetic.generate_wound_dataframe(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
@@ -67,6 +68,8 @@ def main():
         # Asignar ID y tipo de célula en los DataFrames
         monolayer_df['ID'] = f'Monolayer_{i+1}'
         monolayer_df['CellType'] = 0
+        print(monolayer_df.head())
+        print("monolayer_df shape", monolayer_df.shape)
         
         sphere_df['ID'] = f'Sphere_{i+1}'
         sphere_df['CellType'] = 1
@@ -76,26 +79,24 @@ def main():
         wound_df_list.append(sphere_df)
 
         # Generar videos y guardar los frames
-        monolayer_video_name = f"demo/monolayer/monolayer_video_{i+1}.mp4"
-        monolayer_image_folder = f"demo/monolayer/frames_{i+1}"
+        monolayer_video_name = f"data/synth_monolayer/monolayer_video_{i+1}.mp4"
+        monolayer_image_folder = f"data/synth_monolayer/frames_{i+1}"
         W.synthetic.generate_video(monolayer_wounds, monolayer_video_name, monolayer_image_folder, IMG_WIDTH, IMG_HEIGHT)
         
-        sphere_video_name = f"demo/spheres/sphere_video_{i+1}.mp4"
-        sphere_image_folder = f"demo/spheres/frames_{i+1}"
+        sphere_video_name = f"data/synth_spheres/sphere_video_{i+1}.mp4"
+        sphere_image_folder = f"data/synth_spheres/frames_{i+1}"
         W.synthetic.generate_video(sphere_wounds, sphere_video_name, sphere_image_folder, IMG_WIDTH, IMG_HEIGHT)
 
     # Combinar los DataFrames de heridas en un solo DataFrame
     combined_df = pd.concat(wound_df_list, ignore_index=True)
 
     # Guardar el DataFrame combinado en un archivo CSV
-    combined_df.to_csv("demo/combined_wounds.csv", index=False)
+    combined_df.to_csv("data/combined_synth_wounds.csv", index=False)
 
-    print(combined_df)
-
-
+    print(combined_df.head())
 
     # Print shape of the combined DataFrame
-    print("Shape of the combined DataFrame:", combined_df.shape)
+    print("Shape of the synth_combined DataFrame:", combined_df.shape)
 
 
     # # # Generate videos

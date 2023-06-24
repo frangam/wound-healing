@@ -34,7 +34,7 @@ from tensorflow.keras.models import load_model
 
 import woundhealing as W
 
-def predict_and_visualize(model, val_dataset, save_path, num_frames_to_show=6, example_index=0):
+def predict_and_visualize(model, val_dataset, save_path, num_frames_to_show=3, example_index=0):
     """
     Generate and visualize predicted frames.
 
@@ -48,33 +48,44 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_to_show=6, e
       Defaults to 0.
     """
     example = val_dataset[example_index]
-    # frames = example[:num_frames_to_show, ...]
-    # original_frames = example[-num_frames_to_show:, ...]
-    frames = example[:, ...]
-    original_frames = example[:, ...]
-    new_predictions = np.zeros(shape=(num_frames_to_show, *frames[0].shape))
-
+    frames = example[:num_frames_to_show, ...]
+    original_frames = example[num_frames_to_show:, ...]
+    # frames = example[:, ...]
+    # original_frames = example[:, ...]
+    new_predictions = []
     for i in range(num_frames_to_show):
-        # Extract the model's prediction and post-process it.
-        frames = example[: i + 1, ...]
         new_prediction = model.predict(np.expand_dims(frames, axis=0))
         print("new_prediction", new_prediction.shape)
         new_prediction = np.squeeze(new_prediction, axis=0)
         predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0)
         print("predicted_frame",  predicted_frame.shape)
         # frames = np.concatenate((frames, predicted_frame), axis=0)
+        
+        # Extract the model's prediction and post-process it.
+        frames = example[: num_frames_to_show + i + 1, ...]
 
+        #--Save the image
         predicted_frame = np.squeeze(predicted_frame)
-        predicted_frame = predicted_frame * 255  # No es necesario convertir a uint8 en este punto
-        predicted_frame = predicted_frame.astype(np.uint8)
+        # predicted_frame = predicted_frame * 255  # No es necesario convertir a uint8 en este punto
+        # predicted_frame = predicted_frame.astype(np.uint8)
+
+        mask_gray = cv2.normalize(src=predicted_frame, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+        img_uint8 = mask_gray.astype(np.uint8)
+        imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
+        predicted_frame = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
+
         print("predicted_frame",  predicted_frame.shape)
+        new_predictions.append(predicted_frame)
 
-    
-        image_filename = os.path.join(save_path, f"prediction_frame_{example_index}_{i}.png")
-        plt.imsave(image_filename, predicted_frame)
-
-        image_filename = os.path.join(save_path, f"original_frame_{example_index}_{i}.png")
-        plt.imsave(image_filename, frames[i])
+        orig_path = f"{save_path}original/"
+        os.makedirs(orig_path, exist_ok=True)
+        image_filename = os.path.join(orig_path, f"original_frame_{example_index}_{i}.png")
+        plt.imsave(image_filename, original_frames[i], cmap="gray")
+        
+        pred_path = f"{save_path}prediction/"
+        os.makedirs(pred_path, exist_ok=True)
+        image_filename = os.path.join(pred_path, f"prediction_frame_{example_index}_{i}.png")
+        plt.imsave(image_filename, predicted_frame, cmap="gray")
 
     fig, axes = plt.subplots(2, num_frames_to_show, figsize=(num_frames_to_show*2, 4))
 
@@ -85,7 +96,7 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_to_show=6, e
 
     # new_frames = frames[num_frames_to_show:, ...]
     for idx, ax in enumerate(axes[1]):
-        ax.imshow(np.squeeze(new_prediction[idx]), cmap="gray")
+        ax.imshow(np.squeeze(new_predictions[idx]), cmap="gray")
         ax.set_title(f"Predicted Frame {idx + 1}")
         ax.axis("off")
 
@@ -210,25 +221,28 @@ def generate_comparison_video(model, val_dataset, video_dir, video_filename, fra
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
+    p.add_argument('--just-predict', action='store_true', help="Flag to indicate just predict and not training")
+    p.add_argument('--fine-tune', action='store_true', help="Flag to indicate fine-tuning")
+    p.add_argument('--fine-tune-model', type=str, default="results/next-image/synthetic/best_model.h5", help='path to the best model for fine-tuning')
     p.add_argument('--m', type=int, default=0, help="The model architecture. 0: ConvLSTM, 1: Bi-directional ConvLSTM and U-Net")
     p.add_argument('--ts', type=float, default=.8, help='the train split percentage')
-    p.add_argument('--bz', type=int, default=4, help='the GPU batch size')
+    p.add_argument('--bz', type=int, default=32, help='the GPU batch size')
     p.add_argument('--epochs', type=int, default=50, help='the deep learning epochs')
     p.add_argument('--w', type=int, default=64, help='the width')
     p.add_argument('--h', type=int, default=64, help='the height')
-    p.add_argument('--type', type=str, default="monolayer", help='the cell type')
+    p.add_argument('--type', type=str, default="synth_monolayer", help='the cell type: synth_monolayer, real_monolayer')
     p.add_argument('--prefix', type=str, default="synthetic")
 
 
     args = p.parse_args()
-    results_dir = f"demo/next-image/{args.prefix}/"
+    results_dir = f"results/next-image/{args.prefix}/"
     os.makedirs(results_dir, exist_ok=True)
 
     W.utils.set_gpu(args.gpu_id)
    
-    dataset = W.dataset.load_images(base_dir="demo/", image_type=args.type, remove_first_frame=args.type=="monolayer" or args.type=="real_monolayer", resize_width=args.w, resize_height=args.h)
+    dataset = W.dataset.load_images(base_dir="data/", image_type=args.type, remove_first_frame=args.type=="synth_monolayer" or args.type=="real_monolayer", resize_width=args.w, resize_height=args.h)
 
-    # dataset = W.dataset.load_images(base_dir="demo/", image_type="monolayer", remove_first_frame=True, resize_width=64, resize_height=64)
+    # dataset = W.dataset.load_images(base_dir="data/", image_type="monolayer", remove_first_frame=True, resize_width=64, resize_height=64)
 
     print(dataset.shape)
 
@@ -255,46 +269,66 @@ def main():
     print("input shape:", x_train.shape)
     # model = W.model.create_model(x_train.shape[2:], architecture=0, num_layers=10)
 
-    model = W.model.create_model(x_train.shape[2:], architecture=args.m, num_layers=5)
+    if args.fine_tune and args.fine_tune_model != "":
+        model = load_model(args.fine_tune_model)
+        print("loading pre-trained model:", args.fine_tune_model)
+    else:
+        model = W.model.create_model(x_train.shape[2:], architecture=args.m, num_layers=5)
+
+    if not args.just_predict:
+        # Define the checkpoint path and filename
+        checkpoint_path = f"{results_dir}best_model.h5"
+
+        # Define the ModelCheckpoint callback
+        checkpoint = ModelCheckpoint(
+            checkpoint_path,
+            monitor="val_loss",
+            save_best_only=True,
+            mode="min",
+            verbose=1
+        )
+
+        # Define some callbacks to improve training.
+        early_stopping = keras.callbacks.EarlyStopping(monitor="val_loss", patience=50)
+        reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor="val_loss", patience=5)
+
+        # Define modifiable training hyperparameters.
+        epochs = args.epochs
+        batch_size = args.bz
+
+        #utils.limit_gpu_memory(args.gpu_id, 1024*8)
+        # Fit the model to the training data.
+        history = model.fit(
+            x_train,
+            y_train,
+            batch_size=batch_size,
+            epochs=epochs,
+            validation_data=(x_val, y_val),
+            callbacks=[early_stopping, reduce_lr, checkpoint],
+        )
+
+        history_dict = history.history
+        loss_values = history_dict["loss"]
+        val_loss_values = history_dict["val_loss"]
+        epochs = range(1, len(loss_values) + 1)
+
+        plt.plot(epochs, loss_values, color="blue", marker="o", linestyle="-", label="Training loss")
+        plt.plot(epochs, val_loss_values, color="red", linestyle="-", label="Validation loss")
+
+        plt.title("Training and validation loss")
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        plt.legend()
+        plt.savefig(f"results/{args.prefix}_loss_plot.png")  # Guardar el gráfico en un archivo PNG
+        plt.show()
+
     
-    # Define the checkpoint path and filename
-    checkpoint_path = f"{results_dir}best_model.h5"
-
-    # Define the ModelCheckpoint callback
-    checkpoint = ModelCheckpoint(
-        checkpoint_path,
-        monitor="val_loss",
-        save_best_only=True,
-        mode="min",
-        verbose=1
-    )
-
-    # Define some callbacks to improve training.
-    early_stopping = keras.callbacks.EarlyStopping(monitor="val_loss", patience=25)
-    reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor="val_loss", patience=5)
-
-    # Define modifiable training hyperparameters.
-    epochs = args.epochs
-    batch_size = args.bz
-
-
-    #utils.limit_gpu_memory(args.gpu_id, 1024*8)
-    # Fit the model to the training data.
-    model.fit(
-        x_train,
-        y_train,
-        batch_size=batch_size,
-        epochs=epochs,
-        validation_data=(x_val, y_val),
-        callbacks=[early_stopping, reduce_lr, checkpoint],
-    )
-
     best_model = load_model(f"{results_dir}best_model.h5")
 
     total_frames_to_predict = val_dataset.shape[1]//2
     print("total images",total_frames_to_predict)
 
-    for i in range(3):
+    for i in range(len(x_val)):
         predict_and_visualize(best_model, val_dataset, results_dir, total_frames_to_predict, example_index=i)
     # create_gifs(best_model, x_val, results_dir, last_frames_number=x_val.shape[1]//2)
     
