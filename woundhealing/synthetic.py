@@ -112,27 +112,27 @@ def draw_wound(wound, IMG_WIDTH=1000, IMG_HEIGHT=1000):
     """
     matrix = np.zeros((IMG_WIDTH, IMG_HEIGHT))
     for l, r, h in wound:
-        for k in range(l, r + 1):
-            matrix[h, k] = 1
-    img_rgb = np.stack((matrix,) * 3, axis=-1) 
+        matrix[h, l:r+1] = 1
 
-    # Convert the matrix to uint8 (integers from 0 to 255)
-    img_rgb = (img_rgb * 255).astype(np.uint8)
+    img_rgb = np.repeat(matrix[:, :, np.newaxis], 3, axis=2)
+    img_rgb = (img_rgb * 255).astype(np.uint8)     # Convert the matrix to uint8 (integers from 0 to 255)
 
     return img_rgb
 
 
-def generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.3):
+def generate_wound(time_intervals, seed_left, seed_right, seed_high, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.08, final_reduction=0.0001):
     """
     Generates a wound and simulates its healing process.
 
     Args:
-        cell_types (list): The list of cell types.
+        time_intervals (list): The list of time intervals in hours.
         seed_left (int): Initial left edge of the wound.
         seed_right (int): Initial right edge of the wound.
         seed_high (int): Initial height of the wound.
         IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
         IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
+        width_reduction (float, optional): Width reduction ratio for each interval. Defaults to 0.08.
+        final_reduction (float, optional): Width reduction ratio for the final interval. Defaults to 0.1.
 
     Returns:
         list: A list of wounds at each step of the healing process.
@@ -141,10 +141,10 @@ def generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000,
     wound_0 = expand(l, r, seed_high, IMG_WIDTH, IMG_HEIGHT)
     print("wound_0 shape", np.array(wound_0).shape)
     wounds = [wound_0]
-    num_intervals = len(cell_types) - 1
-    width_reduction_ratio = width_reduction** (1 / num_intervals)  # Ratio for reducing width in each interval
+    num_intervals = len(time_intervals) - 1
+    width_reduction_ratio = width_reduction ** (1 / num_intervals)  # Ratio for reducing width in each interval
 
-    for i in range(1, len(cell_types)):
+    for i in range(1, len(time_intervals)):
         if l < r:
             jump = 1
             high = min(jump, max(1, r - l)) + 1
@@ -155,8 +155,11 @@ def generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000,
             high = min(jump, max(1, r - l)) + 1
             r -= np.random.randint(1, high)
 
-        if i == len(cell_types) - 1:
-            l, r = (l + r) // 2, (l + r) // 2
+        if i == len(time_intervals) - 1:
+            new_width = int((r - l) * final_reduction)
+            center = (l + r) // 2
+            l = center - new_width // 2
+            r = center + new_width // 2
         else:
             new_width = int((r - l) * width_reduction_ratio)
             center = (l + r) // 2
@@ -168,6 +171,8 @@ def generate_wound(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000,
     print("wounds shape", np.array(wounds).shape)
 
     return wounds
+
+
 
 
 
