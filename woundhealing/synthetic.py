@@ -38,65 +38,63 @@ def expand_width(left, right, IMG_WIDTH=1000):
     return new_left, new_right
 
 
-def expand_upwards(left, right, height, IMG_WIDTH=1000, IMG_HEIGHT=1000):
+def expand_rightwards(left, right, width, IMG_WIDTH=1000):
     """
     Expands the wound upwards.
 
     Args:
         left (int): The left edge of the wound.
         right (int): The right edge of the wound.
-        height (int): The current height of the wound.
+        width (int): The current width of the wound.
         IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
-        IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
 
     Returns:
         list: List of tuples with the left, right, and height coordinates of the wound.
     """
-    top_edge = [(left, right, height)]
-    while height < IMG_HEIGHT - 1:
+    top_edge = [(left, right, width)]
+    while width < IMG_WIDTH - 1:
         left, right = expand_width(left, right, IMG_WIDTH)
-        height += 1
-        top_edge.append((left, right, height))
+        width += 1
+        top_edge.append((left, right, width))
     return top_edge
 
 
-def expand_downwards(left, right, height, IMG_WIDTH=1000):
+def expand_leftwards(left, right, width, IMG_WIDTH=1000):
     """
     Expands the wound downwards.
 
     Args:
         left (int): The left edge of the wound.
         right (int): The right edge of the wound.
-        height (int): The current height of the wound.
+        width (int): The current width of the wound.
         IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
 
     Returns:
         list: List of tuples with the left, right, and height coordinates of the wound.
     """
     bottom_edge = []
-    while height > 0:
+    while width > 0:
         left, right = expand_width(left, right, IMG_WIDTH)
-        height -= 1
-        bottom_edge.append((left, right, height))
+        width -= 1
+        bottom_edge.append((left, right, width))
     return list(reversed(bottom_edge))
 
 
-def expand(left, right, height, IMG_WIDTH=1000, IMG_HEIGHT=1000):
+def expand(left, right, width, IMG_WIDTH=1000, IMG_HEIGHT=1000):
     """
-    Expands the wound both upwards and downwards.
+    Expands the wound in both directions.
 
     Args:
         left (int): The left edge of the wound.
         right (int): The right edge of the wound.
-        height (int): The current height of the wound.
+        width (int): The current width of the wound.
         IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
         IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
 
     Returns:
-        list: List of tuples with the left, right, and height coordinates of the wound.
+        list: List of tuples with the left, right, and width coordinates of the wound.
     """
-    return expand_downwards(left, right, height, IMG_WIDTH) + expand_upwards(left, right, height, IMG_WIDTH, IMG_HEIGHT)
-
+    return expand_leftwards(left, right, width, IMG_WIDTH) + expand_rightwards(left, right, width, IMG_WIDTH)
 
 def draw_wound(wound, IMG_WIDTH=1000, IMG_HEIGHT=1000):
     """
@@ -120,7 +118,7 @@ def draw_wound(wound, IMG_WIDTH=1000, IMG_HEIGHT=1000):
     return img_rgb
 
 
-def generate_wound(time_intervals, seed_left, seed_right, seed_high, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.08, final_reduction=0.0001):
+def generate_wound(time_intervals, seed_left, seed_right, seed_high, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.08, final_reduction=0.01):
     """
     Generates a wound and simulates its healing process.
 
@@ -132,7 +130,7 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_high, IMG_WIDTH=1
         IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
         IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
         width_reduction (float, optional): Width reduction ratio for each interval. Defaults to 0.08.
-        final_reduction (float, optional): Width reduction ratio for the final interval. Defaults to 0.1.
+        final_reduction (float, optional): Reduction ratio for the final interval. Defaults to 0.01.
 
     Returns:
         list: A list of wounds at each step of the healing process.
@@ -143,6 +141,7 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_high, IMG_WIDTH=1
     wounds = [wound_0]
     num_intervals = len(time_intervals) - 1
     width_reduction_ratio = width_reduction ** (1 / num_intervals)  # Ratio for reducing width in each interval
+    height_reduction_ratio = final_reduction ** (1 / num_intervals)  # Ratio for reducing height in each interval
 
     for i in range(1, len(time_intervals)):
         if l < r:
@@ -157,20 +156,27 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_high, IMG_WIDTH=1
 
         if i == len(time_intervals) - 1:
             new_width = int((r - l) * final_reduction)
+            new_height = int(seed_high * final_reduction)
             center = (l + r) // 2
             l = center - new_width // 2
             r = center + new_width // 2
+            seed_high = new_height
         else:
             new_width = int((r - l) * width_reduction_ratio)
+            new_height = int(seed_high * height_reduction_ratio)
             center = (l + r) // 2
             l = center - new_width // 2
             r = center + new_width // 2
+            seed_high = new_height
 
         wound_i = expand(l, r, seed_high, IMG_WIDTH, IMG_HEIGHT)
         wounds.append(wound_i)
     print("wounds shape", np.array(wounds).shape)
 
     return wounds
+
+
+
 
 
 

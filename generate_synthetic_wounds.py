@@ -40,18 +40,18 @@ def main():
     SPHERES = [0, 3, 6, 9, 12, 15]
 
     # Pick a random start point
-    seed_high  = np.rint(np.random.uniform(0, IMG_HEIGHT, 1))[0].astype(np.int32)
+    seed_width  = np.rint(np.random.uniform(0, IMG_WIDTH, 1))[0].astype(np.int32)
     seed_left  = np.rint(np.random.normal(0.25 * IMG_WIDTH, 1, 1))[0].astype(np.int32)
     seed_right = np.rint(np.random.normal(0.75 * IMG_WIDTH, 1, 1))[0].astype(np.int32)
 
-    print('Initial values:', seed_left, seed_right, seed_high)
+    print('Initial values:', seed_left, seed_right, seed_width)
 
 
     ## Generar múltiples heridas de tipo monolayer y sphere
     num_wounds = args.n
 
-    monolayer_wound_lists = [W.synthetic.generate_wound(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT) for _ in range(num_wounds)]
-    sphere_wound_lists = [W.synthetic.generate_wound(SPHERES, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT) for _ in range(num_wounds)]
+    monolayer_wound_lists = [W.synthetic.generate_wound(MONOLAYER, seed_left, seed_right, seed_width, IMG_WIDTH, IMG_HEIGHT) for _ in range(num_wounds)]
+    sphere_wound_lists = [W.synthetic.generate_wound(SPHERES, seed_left, seed_right, seed_width, IMG_WIDTH, IMG_HEIGHT) for _ in range(num_wounds)]
 
     # Crear una lista para almacenar los DataFrames de heridas
     wound_df_list = []
@@ -62,8 +62,8 @@ def main():
         print("image shape", np.array(monolayer_wounds).shape)
         sphere_wounds = sphere_wound_lists[i]
         
-        monolayer_df = W.synthetic.generate_wound_dataframe(MONOLAYER, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
-        sphere_df = W.synthetic.generate_wound_dataframe(SPHERES, seed_left, seed_right, seed_high, IMG_WIDTH, IMG_HEIGHT)
+        monolayer_df = W.synthetic.generate_wound_dataframe(MONOLAYER, seed_left, seed_right, seed_width, IMG_WIDTH, IMG_HEIGHT)
+        sphere_df = W.synthetic.generate_wound_dataframe(SPHERES, seed_left, seed_right, seed_width, IMG_WIDTH, IMG_HEIGHT)
         
         # Asignar ID y tipo de célula en los DataFrames
         monolayer_df['ID'] = f'Monolayer_{i+1}'
