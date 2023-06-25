@@ -161,7 +161,7 @@ def expand(left, right, width, IMG_WIDTH=1000):
         + expand_rightwards(left, right, width, IMG_WIDTH)
     )
 
-def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.08, num_height_intervals=3, height_cut_max_size=100):
+def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.08, num_height_intervals=2, height_cut_max_size=100):
     """
     Generates a wound and simulates its healing process.
 
@@ -174,7 +174,7 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=
         IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
         width_reduction (float, optional): Width reduction ratio for each interval. Defaults to 0.08.
         num_height_intervals (int, optional): Number of intervals in which height reduction will occur from the last intervals.
-                                              Defaults to 3.
+                                              Defaults to 2.
 
     Returns:
         list: A list of wounds at each step of the healing process.
@@ -215,28 +215,34 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=
 
     # mark vertical holes
     wounds_res = []
+    cuts = []  # Here we will store the cuts
+
     for i, wound in enumerate(wounds):
         # Check if height reduction should occur in the last intervals
-        if i >= num_intervals - num_height_intervals:
-            num_cuts = np.random.randint(0, 4)  # Random number of height cuts between 1 and 3
-            if num_cuts>0:
+        if i >= num_intervals - num_height_intervals-1:
+            # Add new cuts
+            num_cuts = np.random.randint(0, 4)  # Random number of height cuts between 0 and 3
+            if num_cuts > 0:
                 cut_heights = np.random.randint(100, 300, size=num_cuts)  # Random size 
-                cuts = []
                 priority_zones_of_cut = [0, IMG_HEIGHT//2, IMG_HEIGHT]
-                priority_zones_of_cut_produced = []
+                
                 for ch in cut_heights:
                     select_coord_cuts = np.random.randint(0, len(priority_zones_of_cut))  
                     coord_start = priority_zones_of_cut[select_coord_cuts]                
-                    cuts.append([coord_start, coord_start+ch]) # cut is the height coord and the hegiht of the cut
-                for cut_start_height, cut_size in cuts:
-                    for k in range(len(wound)):
-                        if len(wound[k]) == 4:
-                            l, r, h, remove = wound[k]
-                            # print(l, r, h, remove)
-                            if h >= cut_start_height and h<= cut_size:
-                                # print("CUT!!!")
-                                wound[k] = (l, r, h, True)
+                    new_cut = [coord_start, coord_start+ch]  # Cut is the height coord and the hegiht of the cut
+                    # Add new cut to the existing ones
+                    cuts.append(new_cut)
+                    
+            # Apply all the cuts
+            for cut_start_height, cut_size in cuts:
+                for k in range(len(wound)):
+                    if len(wound[k]) == 4:
+                        l, r, h, remove = wound[k]
+                        if h >= cut_start_height and h <= cut_size:
+                            wound[k] = (l, r, h, True)
+                                
         wounds_res.append(wound)
+
 
     return wounds_res
 
