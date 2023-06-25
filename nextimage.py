@@ -74,6 +74,9 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_to_show=3, e
         imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
         predicted_frame = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
 
+        # Cambiar los píxeles que no son negros a blancos
+        predicted_frame[predicted_frame != 0] = 255
+
         print("predicted_frame",  predicted_frame.shape)
         new_predictions.append(predicted_frame)
 
@@ -219,8 +222,19 @@ def generate_comparison_video(model, val_dataset, video_dir, video_filename, fra
 
 
 def main():
+    '''
+    Example of runs:
+    -synthetic images:
+    ./nextimage.py --epochs 10 --type synth_monolayer --prefix synthetic
+
+    - real images:
+    ./nextimage.py --epochs 100 --fine-tune --type real_monolayer --prefix real
+
+    '''
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
+    p.add_argument('--type', type=str, default="synth_monolayer", help='the cell type: synth_monolayer, real_monolayer')
+    p.add_argument('--prefix', type=str, default="synthetic")
     p.add_argument('--just-predict', action='store_true', help="Flag to indicate just predict and not training")
     p.add_argument('--fine-tune', action='store_true', help="Flag to indicate fine-tuning")
     p.add_argument('--fine-tune-model', type=str, default="results/next-image/synthetic/best_model.h5", help='path to the best model for fine-tuning')
@@ -228,10 +242,10 @@ def main():
     p.add_argument('--ts', type=float, default=.8, help='the train split percentage')
     p.add_argument('--bz', type=int, default=32, help='the GPU batch size')
     p.add_argument('--epochs', type=int, default=50, help='the deep learning epochs')
+    p.add_argument('--patience', type=int, default=80, help='the patience hyperparameter')
     p.add_argument('--w', type=int, default=64, help='the width')
     p.add_argument('--h', type=int, default=64, help='the height')
-    p.add_argument('--type', type=str, default="synth_monolayer", help='the cell type: synth_monolayer, real_monolayer')
-    p.add_argument('--prefix', type=str, default="synthetic")
+
 
 
     args = p.parse_args()
@@ -289,7 +303,7 @@ def main():
         )
 
         # Define some callbacks to improve training.
-        early_stopping = keras.callbacks.EarlyStopping(monitor="val_loss", patience=50)
+        early_stopping = keras.callbacks.EarlyStopping(monitor="val_loss", patience=args.patience)
         reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor="val_loss", patience=5)
 
         # Define modifiable training hyperparameters.

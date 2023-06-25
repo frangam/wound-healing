@@ -27,12 +27,15 @@ from tqdm import tqdm
 
 
 from woundhealing.synthetic import draw_wound
-from woundhealing.segment import setup_sam, predict_masks, get_area_perimeter, show_mask, show_points, get_mask_image
+from woundhealing.segment import setup_sam, predict_masks, get_area_perimeter, show_mask, show_points, show_box, get_mask_image
 from woundhealing.utils import set_gpu
+from woundhealing import utils
+
+
 
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
-p.add_argument('--use-real', type=int, default=0, help='to use real data (1) or synthetic (0)')
+p.add_argument('--use-real', type=int, default=1, help='to use real data (1) or synthetic (0)')
 p.add_argument('--pixel-size', type=float, default=3.2, help='the pixel size of your microscope camera')
 
 
@@ -73,12 +76,14 @@ print("herida_0 shape", image_size)
 # setup SAM
 mask_generator, predictor = setup_sam(sam_checkpoint, model_type, device)
 
-   
-includes = [image_size[1]//2,image_size[0]//2]
-exclude_left = [image_size[1]//6, image_size[0]//2]
-exclude_right = [image_size[1] - image_size[1]//6, image_size[0]//2]
-input_point = np.array([includes, exclude_left, exclude_right])
-input_label = np.array([1, 0, 0]) #1 include, 0 exclude
+
+# includes = [image_size[1]//2,image_size[0]//2]
+# exclude_left = [image_size[1]//6, image_size[0]//2]
+# exclude_right = [image_size[1] - image_size[1]//6, image_size[0]//2]
+input_point = None #np.array([exclude_left, exclude_right])
+input_label = None #np.array([0, 0]) #1 include, 0 exclude
+
+
 
 new_ids = []
 new_cell_types = []
@@ -89,6 +94,7 @@ new_perimeters = []
 # df = df.head(2) #TODO remove this line (only for tests)
 for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
     cell_type = row['CellType']
+    print("cell_type", cell_type)
     cell_id = row['ID']
     seg_path = f"{segmentation_folder}{cell_id.split('_')[0]}/{cell_id}/"
     os.makedirs(seg_path, exist_ok=True)
@@ -108,7 +114,17 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
 
                 # Segmentation...
                 # areas, perimeters = generar_segmentacion_herida(image_array, sam_checkpoint, model_type, device)
-                masks, scores, logits = predict_masks(predictor, image_array, input_point, input_label)
+                # masks = mask_generator.generate(image_array)
+
+                if t+1 == utils.len_cell_type_time_step(cell_type)-1:
+                    input_boxes = np.array([image_size[1]//2-200, 0, image_size[1]//2+200, image_size[0]])
+                elif t+1 == utils.len_cell_type_time_step(cell_type):
+                    input_boxes = np.array([image_size[1]//2-100, 0, image_size[1]//2+100, image_size[0]])
+                else:
+                    input_boxes = np.array([image_size[1]//3, 0, image_size[1]-image_size[1]//3, image_size[0]])
+
+
+                masks, scores, logits = predict_masks(predictor, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
                 area, perimeter = get_area_perimeter(image_array, args.pixel_size)
 
                 print("len mask:", len(masks))
@@ -126,56 +142,84 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                 cv2.imwrite(os.path.join(path1, f"{cell_id}_type_{cell_type}_complete_image_{t+1}.png"), image_array)
                 # cv2.imwrite(os.path.join(seg_path, f"{cell_id}_type_{cell_type}_segmentation_{t+1}.png"), masks)
 
-                #segmentations showing points
-                path2 = f"{seg_path}/points/"
-                os.makedirs(path2, exist_ok=True)
-                fig, ax = plt.subplots(figsize=(4, 4))
-                ax.imshow(image_array)
-                show_mask(masks, ax)
-                show_points(input_point, input_label, plt.gca())
-                ax.axis('off')
-                ax.set_xlim([0, image_array.shape[1]])
-                ax.set_ylim([image_array.shape[0], 0])
-                plt.savefig(os.path.join(path2, f"{cell_id}_type_{cell_type}_segmentation_points_{t+1}.png"), bbox_inches='tight', pad_inches=0)
-                plt.close(fig)
+                if len(masks) > 1:
+                    worse_score =+2
+                    best_score =-1
+                    best_mask_id = 0
+                    worse_mask_id = 0
+                    path1_1 = f"{seg_path}/all_masks/"
+                    os.makedirs(path1_1, exist_ok=True)
+                    for k, (mask, score) in enumerate(zip(masks, scores)):
+                        if score > best_score:
+                            best_score = score
+                            best_mask_id = k
+                        if score < worse_score:
+                            worse_score = score
+                            worse_mask_id = k
+                        fig, ax = plt.subplots(figsize=(4, 4))
+                        ax.imshow(image_array)                        
+                        show_mask(mask, plt.gca())
+                        show_box(input_boxes, ax)
+                        # show_points(input_point, input_label, plt.gca())
+                        plt.title(f"Mask {k+1}, Score: {score:.3f}", fontsize=18)
+                        ax.axis('off')
+                        plt.savefig(os.path.join(path1_1, f"{cell_id}_type_{cell_type}_segmentation_mask_{k}_{t+1}.png"), bbox_inches='tight', pad_inches=0)
+                        plt.close(fig)
+                    
+                    #select the best fit for the mask, depending on the time in our case 
+                    if t+1 == utils.len_cell_type_time_step(cell_type):
+                        best_mask = masks[worse_mask_id] #en ultimo frame preferimos la primera mask
+                    elif t+1 == utils.len_cell_type_time_step(cell_type)-1:
+                        best_mask = masks[1] #en el penultimo frame, preferimos la 2ª mask
+                    else:
+                        best_mask = masks[best_mask_id] #ultima mask (best score) en los demás casos
 
-                #RGB segmentation
-                path3 = f"{seg_path}/rgb/"
-                os.makedirs(path3, exist_ok=True)
-                fig, ax = plt.subplots(figsize=(4, 4))
-                ax.imshow(image_array)
-                show_mask(masks, ax)
-                ax.axis('off')
-                ax.set_xlim([0, image_array.shape[1]])
-                ax.set_ylim([image_array.shape[0], 0])
-                plt.savefig(os.path.join(path3, f"{cell_id}_type_{cell_type}_segmentation_combined_{t+1}.png"), bbox_inches='tight', pad_inches=0)
-                plt.close(fig)
+                    #segmentations showing points
+                    path2 = f"{seg_path}/points/"
+                    os.makedirs(path2, exist_ok=True)
+                    fig, ax = plt.subplots(figsize=(4, 4))
+                    ax.imshow(image_array)
+                    show_mask(best_mask, ax)
+                    show_box(input_boxes, ax)
+                    # show_points(input_point, input_label, plt.gca())
+                    ax.axis('off')
+                    ax.set_xlim([0, image_array.shape[1]])
+                    ax.set_ylim([image_array.shape[0], 0])
+                    plt.savefig(os.path.join(path2, f"{cell_id}_type_{cell_type}_segmentation_points_{t+1}.png"), bbox_inches='tight', pad_inches=0)
+                    plt.close(fig)
 
-                #grayscale
-                path4 = f"{seg_path}/gray/"
-                os.makedirs(path4, exist_ok=True)
-                fig, ax = plt.subplots(figsize=(4, 4))
-                # ax.imshow(image_array, cmap='gray')  # Convertir la imagen a escala de grises
-                mask_image = get_mask_image(masks, plt.gca(), alpha=False)
-                mask_gray = cv2.normalize(src=mask_image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-                img_uint8 = mask_gray.astype(np.uint8)
-                imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
-                mask_gray = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
-                # mask_gray = np.ones_like(masks) * 255  # Máscara completamente blanca
+                    #RGB segmentation
+                    path3 = f"{seg_path}/rgb/"
+                    os.makedirs(path3, exist_ok=True)
+                    fig, ax = plt.subplots(figsize=(4, 4))
+                    ax.imshow(image_array)
+                    show_mask(best_mask, ax)
+                    ax.axis('off')
+                    ax.set_xlim([0, image_array.shape[1]])
+                    ax.set_ylim([image_array.shape[0], 0])
+                    plt.savefig(os.path.join(path3, f"{cell_id}_type_{cell_type}_segmentation_combined_{t+1}.png"), bbox_inches='tight', pad_inches=0)
+                    plt.close(fig)
 
-                ax.imshow(mask_gray, cmap='gray')  # Convertir la imagen a escala de grises
-                ax.axis('off')
-                ax.set_xlim([0, image_array.shape[1]])
-                ax.set_ylim([image_array.shape[0], 0])
-                plt.savefig(os.path.join(path4, f"{cell_id}_type_{cell_type}_segmentation_{t+1}.png"), bbox_inches='tight', pad_inches=0)
-                plt.close(fig)
+                    #grayscale
+                    path4 = f"{seg_path}/gray/"
+                    os.makedirs(path4, exist_ok=True)
+                    fig, ax = plt.subplots(figsize=(4, 4))
+                    # ax.imshow(image_array, cmap='gray')  # Convertir la imagen a escala de grises
+                    mask_image = get_mask_image(best_mask, plt.gca(), alpha=False)
+                    mask_gray = cv2.normalize(src=mask_image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+                    img_uint8 = mask_gray.astype(np.uint8)
+                    imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
+                    mask_gray = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
+                    # mask_gray = np.ones_like(best_mask) * 255  # Máscara completamente blanca
+
+                    ax.imshow(mask_gray, cmap='gray')  # Convertir la imagen a escala de grises
+                    ax.axis('off')
+                    ax.set_xlim([0, image_array.shape[1]])
+                    ax.set_ylim([image_array.shape[0], 0])
+                    plt.savefig(os.path.join(path4, f"{cell_id}_type_{cell_type}_segmentation_{t+1}.png"), bbox_inches='tight', pad_inches=0)
+                    plt.close(fig)
 
 
-
-                # plt.figure(figsize=(4,2))
-                # plt.imshow(image_array)
-                # Guarda la figura en el disco
-                # plt.savefig(os.path.join(seg_path, f"{cell_id}_type_{cell_type}_segmentation_{t+1}.png"))
 new_df = pd.DataFrame({
     'ID': new_ids,
     'CellType': new_cell_types,

@@ -51,11 +51,11 @@ def expand_rightwards(left, right, width, IMG_WIDTH=1000):
     Returns:
         list: List of tuples with the left, right, and height coordinates of the wound.
     """
-    top_edge = [(left, right, width)]
+    top_edge = [(left, right, width, False)] #False: indicates no cut in height
     while width < IMG_WIDTH - 1:
         left, right = expand_width(left, right, IMG_WIDTH)
         width += 1
-        top_edge.append((left, right, width))
+        top_edge.append((left, right, width, False)) #False: indicates no cut in height
     return top_edge
 
 
@@ -76,49 +76,92 @@ def expand_leftwards(left, right, width, IMG_WIDTH=1000):
     while width > 0:
         left, right = expand_width(left, right, IMG_WIDTH)
         width -= 1
-        bottom_edge.append((left, right, width))
+        bottom_edge.append((left, right, width, False)) #False: indicates no cut in height
     return list(reversed(bottom_edge))
 
 
-def expand(left, right, width, IMG_WIDTH=1000, IMG_HEIGHT=1000):
+def expand_height(top, bottom, height, IMG_HEIGHT=1000):
     """
-    Expands the wound in both directions.
+    Modifies the wound's height in each time step.
+
+    Args:
+        top (int): The top edge of the wound.
+        bottom (int): The bottom edge of the wound.
+        IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
+
+    Returns:
+        tuple: New positions for the top and bottom edges.
+    """
+    r = np.random.uniform()
+    new_top = top - 1 if (r < 1/3 and top > 0) else top + 1 if (r > 2/3 and top < IMG_HEIGHT - 1) else top
+
+    r = np.random.uniform()
+    new_bottom = bottom - 1 if (r < 1/3 and bottom > new_top + 1) else bottom + 1 if (r > 2/3 and bottom < IMG_HEIGHT - 1) else bottom
+
+    return new_top, new_bottom
+
+
+def expand_upwards(top, bottom, height, IMG_HEIGHT=1000):
+    """
+    Expands the wound upwards.
+
+    Args:
+        top (int): The top edge of the wound.
+        bottom (int): The bottom edge of the wound.
+        height (int): The current height of the wound.
+        IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
+
+    Returns:
+        list: List of tuples with the top, bottom, and height coordinates of the wound.
+    """
+    wound = [(top, bottom, height)]
+    while height < IMG_HEIGHT - 1:
+        top, bottom = expand_height(top, bottom, IMG_HEIGHT)
+        height += 1
+        wound.append((top, bottom, height))
+    return wound
+
+
+def expand_downwards(top, bottom, height, IMG_HEIGHT=1000):
+    """
+    Expands the wound downwards.
+
+    Args:
+        top (int): The top edge of the wound.
+        bottom (int): The bottom edge of the wound.
+        height (int): The current height of the wound.
+        IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
+
+    Returns:
+        list: List of tuples with the top, bottom, and height coordinates of the wound.
+    """
+    wound = []
+    while height > 0:
+        top, bottom = expand_height(top, bottom, IMG_HEIGHT)
+        height -= 1
+        wound.append((top, bottom, height))
+    return list(reversed(wound))
+
+
+def expand(left, right, width, IMG_WIDTH=1000):
+    """
+    Expands the wound in both width and height.
 
     Args:
         left (int): The left edge of the wound.
         right (int): The right edge of the wound.
         width (int): The current width of the wound.
         IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
-        IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
 
     Returns:
-        list: List of tuples with the left, right, and width coordinates of the wound.
+        list: List of tuples with the left, right, and height coordinates of the wound.
     """
-    return expand_leftwards(left, right, width, IMG_WIDTH) + expand_rightwards(left, right, width, IMG_WIDTH)
+    return (
+        expand_leftwards(left, right, width, IMG_WIDTH)
+        + expand_rightwards(left, right, width, IMG_WIDTH)
+    )
 
-def draw_wound(wound, IMG_WIDTH=1000, IMG_HEIGHT=1000):
-    """
-    Draws the wound on an image.
-
-    Args:
-        wound (list): List of tuples with the left, right, and height coordinates of the wound.
-        IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
-        IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
-
-    Returns:
-        ndarray: An image of the wound.
-    """
-    matrix = np.zeros((IMG_WIDTH, IMG_HEIGHT))
-    for l, r, h in wound:
-        matrix[h, l:r+1] = 1
-
-    img_rgb = np.repeat(matrix[:, :, np.newaxis], 3, axis=2)
-    img_rgb = (img_rgb * 255).astype(np.uint8)     # Convert the matrix to uint8 (integers from 0 to 255)
-
-    return img_rgb
-
-
-def generate_wound(time_intervals, seed_left, seed_right, seed_high, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.08, final_reduction=0.01):
+def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.08, num_height_intervals=3, height_cut_max_size=100):
     """
     Generates a wound and simulates its healing process.
 
@@ -126,54 +169,76 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_high, IMG_WIDTH=1
         time_intervals (list): The list of time intervals in hours.
         seed_left (int): Initial left edge of the wound.
         seed_right (int): Initial right edge of the wound.
-        seed_high (int): Initial height of the wound.
+        seed_width (int): Initial width of the wound.
         IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
         IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
         width_reduction (float, optional): Width reduction ratio for each interval. Defaults to 0.08.
-        final_reduction (float, optional): Reduction ratio for the final interval. Defaults to 0.01.
+        num_height_intervals (int, optional): Number of intervals in which height reduction will occur from the last intervals.
+                                              Defaults to 3.
 
     Returns:
         list: A list of wounds at each step of the healing process.
     """
     l, r = seed_left, seed_right
-    wound_0 = expand(l, r, seed_high, IMG_WIDTH, IMG_HEIGHT)
-    print("wound_0 shape", np.array(wound_0).shape)
+    seed_width = seed_right - seed_left
+    wound_0 = expand(l, r, seed_width, IMG_WIDTH)
     wounds = [wound_0]
     num_intervals = len(time_intervals) - 1
     width_reduction_ratio = width_reduction ** (1 / num_intervals)  # Ratio for reducing width in each interval
-    height_reduction_ratio = final_reduction ** (1 / num_intervals)  # Ratio for reducing height in each interval
+
+    height_cuts = []  # List to store the height cuts
 
     for i in range(1, len(time_intervals)):
         if l < r:
             jump = 1
-            high = min(jump, max(1, r - l)) + 1
-            l += np.random.randint(1, high)
+            width = min(jump, max(1, r - l)) + 1
+            l += np.random.randint(1, width)
 
         if r > l:
             jump = 1
-            high = min(jump, max(1, r - l)) + 1
-            r -= np.random.randint(1, high)
+            width = min(jump, max(1, r - l)) + 1
+            r -= np.random.randint(1, width)
 
         if i == len(time_intervals) - 1:
-            new_width = int((r - l) * final_reduction)
-            new_height = int(seed_high * final_reduction)
+            new_width = int((r - l) * width_reduction)
             center = (l + r) // 2
             l = center - new_width // 2
             r = center + new_width // 2
-            seed_high = new_height
         else:
             new_width = int((r - l) * width_reduction_ratio)
-            new_height = int(seed_high * height_reduction_ratio)
             center = (l + r) // 2
             l = center - new_width // 2
             r = center + new_width // 2
-            seed_high = new_height
-
-        wound_i = expand(l, r, seed_high, IMG_WIDTH, IMG_HEIGHT)
+        
+        wound_i = expand(l, r, seed_width, IMG_WIDTH)
         wounds.append(wound_i)
-    print("wounds shape", np.array(wounds).shape)
 
-    return wounds
+    # mark vertical holes
+    wounds_res = []
+    for i, wound in enumerate(wounds):
+        # Check if height reduction should occur in the last intervals
+        if i >= num_intervals - num_height_intervals:
+            num_cuts = np.random.randint(0, 4)  # Random number of height cuts between 1 and 3
+            if num_cuts>0:
+                cut_heights = np.random.randint(100, 300, size=num_cuts)  # Random size 
+                cuts = []
+                priority_zones_of_cut = [0, IMG_HEIGHT//2, IMG_HEIGHT]
+                priority_zones_of_cut_produced = []
+                for ch in cut_heights:
+                    select_coord_cuts = np.random.randint(0, len(priority_zones_of_cut))  
+                    coord_start = priority_zones_of_cut[select_coord_cuts]                
+                    cuts.append([coord_start, coord_start+ch]) # cut is the height coord and the hegiht of the cut
+                for cut_start_height, cut_size in cuts:
+                    for k in range(len(wound)):
+                        if len(wound[k]) == 4:
+                            l, r, h, remove = wound[k]
+                            # print(l, r, h, remove)
+                            if h >= cut_start_height and h<= cut_size:
+                                # print("CUT!!!")
+                                wound[k] = (l, r, h, True)
+        wounds_res.append(wound)
+
+    return wounds_res
 
 
 
@@ -183,6 +248,34 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_high, IMG_WIDTH=1
 
 
 
+
+
+
+def draw_wound(wound, IMG_WIDTH=1000, IMG_HEIGHT=1000):
+    """
+    Draws the wound on an image.
+
+    Args:
+        wound (list): List of tuples with the left, right, height, and remove_flag coordinates of the wound.
+        IMG_WIDTH (int, optional): The width of the image. Defaults to 1000.
+        IMG_HEIGHT (int, optional): The height of the image. Defaults to 1000.
+
+    Returns:
+        ndarray: An image of the wound.
+    """
+    matrix = np.zeros((IMG_WIDTH, IMG_HEIGHT))
+    for value in wound:
+
+        l, r, h, remove_flag = value if len(value) == 4 else (*value, False)
+        if not remove_flag:
+            matrix[h, l:r+1] = 1
+        # else:
+        #     print("no draw")
+
+    img_rgb = np.repeat(matrix[:, :, np.newaxis], 3, axis=2)
+    img_rgb = (img_rgb * 255).astype(np.uint8)
+
+    return img_rgb
 
 
 
@@ -204,7 +297,6 @@ def generate_video(wounds, video_name, image_folder, IMG_WIDTH=1000, IMG_HEIGHT=
     if video_directory and not os.path.exists(video_directory):
         os.makedirs(video_directory)
 
-
     # Create the VideoWriter object
     video_output = video_name
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -221,7 +313,6 @@ def generate_video(wounds, video_name, image_folder, IMG_WIDTH=1000, IMG_HEIGHT=
 
     # Release the resources
     video.release()
-
 
 
 def generate_wound_dataframe(cell_types, seed_left, seed_right, seed_high, IMG_WIDTH=1000, IMG_HEIGHT=1000):

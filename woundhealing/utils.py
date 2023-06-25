@@ -2,6 +2,18 @@ import os
 import tensorflow as tf
 import tifffile
 
+
+MONOLAYER = [0, 3, 6, 9, 12, 24, 27]
+SPHERES = [0, 3, 6, 9, 12, 15]
+CELL_TYPES = {0: MONOLAYER, 1: SPHERES}
+
+def len_cell_type_time_step(celltype=0):
+    try:
+        ts = CELL_TYPES[celltype]
+        return len(ts)
+    except RuntimeError as e:
+        print(f"Cell type [{celltype}] not availble [we only work with: {CELL_TYPES.keys()}]")
+
 # Specify the GPU ID of the device you wish to use. 
 # Note: The GPU ID starts at 0.
 def set_gpu(gpu_id=0):

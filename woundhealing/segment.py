@@ -85,6 +85,21 @@ def get_mask_image(mask, random_color=False, alpha=True):
 
 def show_mask(mask, ax, random_color=False, alpha=True):
     ax.imshow(get_mask_image(mask, random_color, alpha))
+
+def show_anns(anns):
+    if len(anns) == 0:
+        return
+    sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
+    ax = plt.gca()
+    ax.set_autoscale_on(False)
+
+    img = np.ones((sorted_anns[0]['segmentation'].shape[0], sorted_anns[0]['segmentation'].shape[1], 4))
+    img[:,:,3] = 0
+    for ann in sorted_anns:
+        m = ann['segmentation']
+        color_mask = np.concatenate([np.random.random(3), [0.35]])
+        img[m] = color_mask
+    ax.imshow(img)
     
 def show_points(coords, labels, ax, marker_size=375):
     pos_points = coords[labels==1]
@@ -106,16 +121,24 @@ def show_box(box, ax):
 def setup_sam(sam_checkpoint, model_type, device):
     sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
     sam.to(device=device)
-    mask_generator = SamAutomaticMaskGenerator(sam)
+    mask_generator = SamAutomaticMaskGenerator(
+        model=sam,
+        points_per_side=32,
+        pred_iou_thresh=0.86,
+        stability_score_thresh=0.92,
+        crop_n_layers=1,
+        crop_n_points_downscale_factor=2,
+        min_mask_region_area=200*1532 + 100)
     predictor = SamPredictor(sam)
     return mask_generator, predictor
 
 # Predict masks
-def predict_masks(predictor, image, input_point, input_label, multimask_output=False):
+def predict_masks(predictor, image, input_point, input_label, input_boxes, multimask_output=True):
     predictor.set_image(image)
     masks, scores, logits = predictor.predict(
         point_coords=input_point,
         point_labels=input_label,
+        box=input_boxes,
         multimask_output=multimask_output,
     )
     return masks, scores, logits
@@ -152,14 +175,15 @@ def generar_segmentacion_herida(heridas, sam_checkpoint, model_type, device, pix
     for herida in heridas:
         herida = np.array(herida)
         print(herida.shape)
-        includes = [herida.shape[1]//2, herida.shape[0]//2]
+        # includes = [herida.shape[1]//2, herida.shape[0]//2]
         exclude_left = [herida.shape[1]//6, herida.shape[0]//2]
         exclude_right = [herida.shape[1] - herida.shape[1]//6, herida.shape[0]//2]
-        input_point = np.array([includes, exclude_left, exclude_right])
-        input_label = np.array([1, 0, 0]) #1 include, 0 exclude
+        input_point = np.array([exclude_left, exclude_right])
+        input_label = np.array([0, 0]) #1 include, 0 exclude
+        input_boxes = np.array([herida[1]//3, 0, herida[1]-herida[1]//3, herida[0]])
 
 
-        masks, scores, logits = predict_masks(predictor, herida, input_point, input_label)
+        masks, scores, logits = predict_masks(predictor, herida, input_point, input_label, input_boxes)
         area_um2, perimeter_um = get_area_perimeter(herida, pixel_size=3.2)
 
         print("Physical area in square micrometers:", area_um2)
