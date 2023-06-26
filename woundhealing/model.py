@@ -76,6 +76,8 @@ def architecture_conv_lstm(input_shape, num_layers):
             padding="same",
             return_sequences=True,
             activation="relu",
+            dropout=0.3,
+            recurrent_dropout=0.3
         )(x)
         x = BatchNormalization()(x)
 
