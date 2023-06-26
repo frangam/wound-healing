@@ -35,7 +35,7 @@ from tensorflow.keras.models import load_model
 
 import woundhealing as W
 
-def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, num_frames_to_show=4, example_index=0):
+def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, num_frames_to_show=4, example_index=0, thr_whit=0):
     """
     Generate and visualize predicted frames.
 
@@ -68,15 +68,17 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, n
         new_prediction = np.squeeze(new_prediction, axis=0)
         predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0)
         predicted_frame = np.squeeze(predicted_frame)
+
         if len(predicted_frame.shape) == 3 and predicted_frame.shape[-1] != 1:
             predicted_frame = cv2.cvtColor(predicted_frame, cv2.COLOR_BGR2GRAY)
+        # else:
+        #     mask_gray = cv2.normalize(src=predicted_frame, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+        #     img_uint8 = mask_gray.astype(np.uint8)
+        #     imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_GRAY2RGB)
+        #     predicted_frame = cv2.cvtColor(imgRGB, cv2.COLOR_RGB2GRAY)
+        # predicted_frame = predicted_frame.astype(np.uint8)
 
-        # mask_gray = cv2.normalize(src=predicted_frame, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-        # img_uint8 = mask_gray.astype(np.uint8)
-        # imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_GRAY2RGB)
-        # predicted_frame = cv2.cvtColor(imgRGB, cv2.COLOR_RGB2GRAY)
-
-        predicted_frame[predicted_frame > 25] = 255
+        predicted_frame[predicted_frame > thr_whit] = 255
 
         new_predictions.append(predicted_frame)
 
@@ -233,6 +235,9 @@ def main():
     Example of runs:
     -synthetic images:
     ./nextimage.py --epochs 10 --type synth_monolayer --prefix synthetic
+    ./nextimage.py --epochs 100 --layers 5 --bz 4 --m 0
+
+    ./nextimage.py --just-predict
 
     - real images:
     ./nextimage.py --epochs 100 --fine-tune --type real_monolayer --prefix real
@@ -250,9 +255,13 @@ def main():
     p.add_argument('--ts', type=float, default=.8, help='the train split percentage')
     p.add_argument('--bz', type=int, default=32, help='the GPU batch size')
     p.add_argument('--epochs', type=int, default=50, help='the deep learning epochs')
-    p.add_argument('--patience', type=int, default=50, help='the patience hyperparameter')
+    p.add_argument('--patience', type=int, default=30, help='the patience hyperparameter')
     p.add_argument('--w', type=int, default=64, help='the width')
     p.add_argument('--h', type=int, default=64, help='the height')
+    p.add_argument('--th-white', type=int, default=0.35, help='the threshold to draw with wite color (greater than this value)')
+    p.add_argument('--start-frame', type=int, default=0, help='the start frame to predict')
+    p.add_argument('--frames-pred', type=int, default=7, help='the number of frames to predict')
+
 
 
 
@@ -262,7 +271,8 @@ def main():
 
     W.utils.set_gpu(args.gpu_id)
    
-    dataset = W.dataset.load_images(base_dir="data/", image_type=args.type, remove_first_frame=args.type=="synth_monolayer" or args.type=="real_monolayer", resize_width=args.w, resize_height=args.h)
+    # dataset = W.dataset.load_images(base_dir="data/", image_type=args.type, remove_first_frame=args.type=="synth_monolayer" or args.type=="real_monolayer", resize_width=args.w, resize_height=args.h)
+    dataset = W.dataset.load_images(base_dir="data/", image_type=args.type, remove_first_frame=False, resize_width=args.w, resize_height=args.h)
 
     # dataset = W.dataset.load_images(base_dir="data/", image_type="monolayer", remove_first_frame=True, resize_width=64, resize_height=64)
 
@@ -347,11 +357,11 @@ def main():
     
     best_model = load_model(f"{results_dir}best_model.h5")
 
-    total_frames_to_predict = 6# (val_dataset.shape[1]//2 ) +1
-    print("total images",total_frames_to_predict)
+    # total_frames_to_predict = (val_dataset.shape[1]//2 )
+    print("total images",args.frames_pred)
 
     for i in range(len(x_val)):
-        predict_and_visualize(best_model, val_dataset, results_dir,num_frames_initial=2, num_frames_to_show=total_frames_to_predict, example_index=i)
+        predict_and_visualize(best_model, val_dataset, results_dir,num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, thr_whit=args.th_white)
     # create_gifs(best_model, x_val, results_dir, last_frames_number=x_val.shape[1]//2)
     
     # final_results_video = f"{results_dir}video/"
