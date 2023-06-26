@@ -23,6 +23,7 @@ from PIL import Image
 from IPython.display import display
 import cv2
 import imageio
+from tqdm import tqdm
 
 
 import matplotlib.pyplot as plt
@@ -34,7 +35,7 @@ from tensorflow.keras.models import load_model
 
 import woundhealing as W
 
-def predict_and_visualize(model, val_dataset, save_path, num_frames_to_show=3, example_index=0):
+def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, num_frames_to_show=4, example_index=0):
     """
     Generate and visualize predicted frames.
 
@@ -48,42 +49,46 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_to_show=3, e
       Defaults to 0.
     """
     example = val_dataset[example_index]
-    frames = example[:num_frames_to_show, ...]
-    original_frames = example[num_frames_to_show:, ...]
-    # frames = example[:, ...]
-    # original_frames = example[:, ...]
+    frames = example[:num_frames_initial, ...]
+    original_frames = example[num_frames_initial:, ...]
+    h, w = frames.shape[1], frames.shape[2]
     new_predictions = []
-    for i in range(num_frames_to_show):
+
+    for i in tqdm(range(num_frames_to_show), "Predicting..."):
+        print("frames shape", np.array(frames).shape)
+        # Check if there are enough frames in the example
+        if num_frames_initial + i + 1 <= len(example):
+            frames = example[: num_frames_initial + i + 1, ...]
+        else:
+            # If not, create a black image and add it to frames
+            black_image = np.zeros((1, h, w, 3))  # Added extra dimension
+            frames = np.concatenate((frames, black_image), axis=0)
+        
         new_prediction = model.predict(np.expand_dims(frames, axis=0))
-        print("new_prediction", new_prediction.shape)
         new_prediction = np.squeeze(new_prediction, axis=0)
         predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0)
-        print("predicted_frame",  predicted_frame.shape)
-        # frames = np.concatenate((frames, predicted_frame), axis=0)
-        
-        # Extract the model's prediction and post-process it.
-        frames = example[: num_frames_to_show + i + 1, ...]
-
-        #--Save the image
         predicted_frame = np.squeeze(predicted_frame)
-        # predicted_frame = predicted_frame * 255  # No es necesario convertir a uint8 en este punto
-        # predicted_frame = predicted_frame.astype(np.uint8)
+        if len(predicted_frame.shape) == 3 and predicted_frame.shape[-1] != 1:
+            predicted_frame = cv2.cvtColor(predicted_frame, cv2.COLOR_BGR2GRAY)
 
-        mask_gray = cv2.normalize(src=predicted_frame, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-        img_uint8 = mask_gray.astype(np.uint8)
-        imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
-        predicted_frame = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
+        # mask_gray = cv2.normalize(src=predicted_frame, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+        # img_uint8 = mask_gray.astype(np.uint8)
+        # imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_GRAY2RGB)
+        # predicted_frame = cv2.cvtColor(imgRGB, cv2.COLOR_RGB2GRAY)
 
-        # Cambiar los píxeles que no son negros a blancos
-        predicted_frame[predicted_frame != 0] = 255
+        predicted_frame[predicted_frame > 25] = 255
 
-        print("predicted_frame",  predicted_frame.shape)
         new_predictions.append(predicted_frame)
 
         orig_path = f"{save_path}original/"
         os.makedirs(orig_path, exist_ok=True)
         image_filename = os.path.join(orig_path, f"original_frame_{example_index}_{i}.png")
-        plt.imsave(image_filename, original_frames[i], cmap="gray")
+
+        if i < len(original_frames):
+            plt.imsave(image_filename, original_frames[i], cmap="gray")
+        else:
+            black_image = Image.new('L', (w, h))
+            black_image.save(image_filename)
         
         pred_path = f"{save_path}prediction/"
         os.makedirs(pred_path, exist_ok=True)
@@ -93,14 +98,16 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_to_show=3, e
     fig, axes = plt.subplots(2, num_frames_to_show, figsize=(num_frames_to_show*2, 4))
 
     for idx, ax in enumerate(axes[0]):
-        ax.imshow(np.squeeze(original_frames[idx]), cmap="gray")
-        ax.set_title(f"Original Frame {idx + 1}")
+        if idx < len(original_frames):
+            ax.imshow(np.squeeze(original_frames[idx]), cmap="gray")
+        else:
+            ax.imshow(np.zeros((h, w)), cmap="gray")
+        ax.set_title(f"Original Frame {num_frames_initial + idx  + 1}")
         ax.axis("off")
 
-    # new_frames = frames[num_frames_to_show:, ...]
     for idx, ax in enumerate(axes[1]):
         ax.imshow(np.squeeze(new_predictions[idx]), cmap="gray")
-        ax.set_title(f"Predicted Frame {idx + 1}")
+        ax.set_title(f"Predicted Frame {num_frames_initial+ idx  + 1}")
         ax.axis("off")
 
     plt.savefig(f"{save_path}predictions_{example_index}")
@@ -239,10 +246,11 @@ def main():
     p.add_argument('--fine-tune', action='store_true', help="Flag to indicate fine-tuning")
     p.add_argument('--fine-tune-model', type=str, default="results/next-image/synthetic/best_model.h5", help='path to the best model for fine-tuning')
     p.add_argument('--m', type=int, default=0, help="The model architecture. 0: ConvLSTM, 1: Bi-directional ConvLSTM and U-Net")
+    p.add_argument('--layers', type=int, default=10, help="The number of hidden layers")
     p.add_argument('--ts', type=float, default=.8, help='the train split percentage')
     p.add_argument('--bz', type=int, default=32, help='the GPU batch size')
     p.add_argument('--epochs', type=int, default=50, help='the deep learning epochs')
-    p.add_argument('--patience', type=int, default=80, help='the patience hyperparameter')
+    p.add_argument('--patience', type=int, default=50, help='the patience hyperparameter')
     p.add_argument('--w', type=int, default=64, help='the width')
     p.add_argument('--h', type=int, default=64, help='the height')
 
@@ -287,7 +295,7 @@ def main():
         model = load_model(args.fine_tune_model)
         print("loading pre-trained model:", args.fine_tune_model)
     else:
-        model = W.model.create_model(x_train.shape[2:], architecture=args.m, num_layers=5)
+        model = W.model.create_model(x_train.shape[2:], architecture=args.m, num_layers=args.layers)
 
     if not args.just_predict:
         # Define the checkpoint path and filename
@@ -339,11 +347,11 @@ def main():
     
     best_model = load_model(f"{results_dir}best_model.h5")
 
-    total_frames_to_predict = val_dataset.shape[1]//2
+    total_frames_to_predict = 6# (val_dataset.shape[1]//2 ) +1
     print("total images",total_frames_to_predict)
 
     for i in range(len(x_val)):
-        predict_and_visualize(best_model, val_dataset, results_dir, total_frames_to_predict, example_index=i)
+        predict_and_visualize(best_model, val_dataset, results_dir,num_frames_initial=2, num_frames_to_show=total_frames_to_predict, example_index=i)
     # create_gifs(best_model, x_val, results_dir, last_frames_number=x_val.shape[1]//2)
     
     # final_results_video = f"{results_dir}video/"

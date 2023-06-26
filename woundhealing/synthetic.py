@@ -161,7 +161,7 @@ def expand(left, right, width, IMG_WIDTH=1000):
         + expand_rightwards(left, right, width, IMG_WIDTH)
     )
 
-def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.08, num_height_intervals=2, height_cut_max_size=100):
+def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=1000, IMG_HEIGHT=1000, width_reduction=0.08, num_height_intervals=3, height_cut_max_size=100, larger_width_reduction=0.01):
     """
     Generates a wound and simulates its healing process.
 
@@ -175,6 +175,7 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=
         width_reduction (float, optional): Width reduction ratio for each interval. Defaults to 0.08.
         num_height_intervals (int, optional): Number of intervals in which height reduction will occur from the last intervals.
                                               Defaults to 2.
+        larger_width_reduction (float, optional): Larger width reduction ratio for the last frame. Defaults to 0.2.
 
     Returns:
         list: A list of wounds at each step of the healing process.
@@ -199,16 +200,16 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=
             width = min(jump, max(1, r - l)) + 1
             r -= np.random.randint(1, width)
 
-        if i == len(time_intervals) - 1:
+        if i == len(time_intervals) - 2:
             new_width = int((r - l) * width_reduction)
-            center = (l + r) // 2
-            l = center - new_width // 2
-            r = center + new_width // 2
+        elif i == len(time_intervals) - 1:
+            new_width = int((r - l) * larger_width_reduction)
         else:
             new_width = int((r - l) * width_reduction_ratio)
-            center = (l + r) // 2
-            l = center - new_width // 2
-            r = center + new_width // 2
+        
+        center = (l + r) // 2
+        l = center - new_width // 2
+        r = center + new_width // 2
         
         wound_i = expand(l, r, seed_width, IMG_WIDTH)
         wounds.append(wound_i)
@@ -219,13 +220,31 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=
 
     for i, wound in enumerate(wounds):
         # Check if height reduction should occur in the last intervals
-        if i >= num_intervals - num_height_intervals-1:
+        if i >= num_intervals - num_height_intervals:
             # Add new cuts
             num_cuts = np.random.randint(0, 4)  # Random number of height cuts between 0 and 3
+
+            # Increase the number of cuts for the last wound
+            if i == num_intervals - 1:  # penúltimo intervalo
+                num_cuts = max(num_cuts, np.random.randint(4, 8))  # Use a higher range for random number of cuts
+            elif i == num_intervals:  # último intervalo
+                num_cuts = max(num_cuts, np.random.randint(2, 5))  # Use a higher range for random number of cuts
+
+
             if num_cuts > 0:
                 cut_heights = np.random.randint(100, 300, size=num_cuts)  # Random size 
+
+                # Increase the size of cuts for the last wound
+                if i == num_intervals - 1:  # penúltimo intervalo
+                    # cut_heights is a random number close to IMG_HEIGHT
+                    th = int(0.1 * IMG_HEIGHT)  # Changing the threshold to 10% of IMG_HEIGHT
+                    cut_heights = np.random.randint(th, th*2, size=num_cuts)  
+                elif i == num_intervals:  # último intervalo
+                    th = int(0.8 * IMG_HEIGHT)  # Changing the threshold to 80% of IMG_HEIGHT
+                    cut_heights = np.random.randint(th, th*2, size=num_cuts)  
+
                 priority_zones_of_cut = [0, IMG_HEIGHT//2, IMG_HEIGHT]
-                
+                    
                 for ch in cut_heights:
                     select_coord_cuts = np.random.randint(0, len(priority_zones_of_cut))  
                     coord_start = priority_zones_of_cut[select_coord_cuts]                
@@ -240,11 +259,32 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=
                         l, r, h, remove = wound[k]
                         if h >= cut_start_height and h <= cut_size:
                             wound[k] = (l, r, h, True)
-                                
+            
+            # For the last wound, make a specific cut from the bottom and from the top
+            if i == num_intervals - 1 or i == num_intervals:  # penúltimo intervalo
+                # Cut from the bottom
+                cut_start_height = IMG_HEIGHT - th
+                cut_size = IMG_HEIGHT
+                for k in range(len(wound)):
+                    if len(wound[k]) == 4:
+                        l, r, h, remove = wound[k]
+                        if h >= cut_start_height and h <= cut_size:
+                            wound[k] = (l, r, h, True)
+
+                # Cut from the top
+                cut_start_height = 0
+                cut_size = th
+                for k in range(len(wound)):
+                    if len(wound[k]) == 4:
+                        l, r, h, remove = wound[k]
+                        if h >= cut_start_height and h <= cut_size:
+                            wound[k] = (l, r, h, True)
+
         wounds_res.append(wound)
 
 
     return wounds_res
+
 
 
 
