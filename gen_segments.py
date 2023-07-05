@@ -32,11 +32,20 @@ from woundhealing.utils import set_gpu
 from woundhealing import utils
 
 
+'''
+original SAM: "sam/sam_vit_h_4b8939.pth"; model_type="vit_h"
+MedSAM: "sam_vit_b_01ec64.pth; model_type="vit_b"
 
+Example of run:
+
+./gen_segments.py --gpu-id 3 --sam_checkpoint sam/medsam_tune_mask_decoder.pth --model_type vit_b
+'''
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
 p.add_argument('--use-real', type=int, default=1, help='to use real data (1) or synthetic (0)')
 p.add_argument('--pixel-size', type=float, default=3.2, help='the pixel size of your microscope camera')
+# p.add_argument('--sam_checkpoint', type=str, default="sam/medsam_tune_mask_decoder.pth", help='the Segment Anythin Model checkpoint path')
+# p.add_argument('--model_type', type=str, default="vit_b", help='the Segment Anythin Model checkpoint path')
 
 
 args = p.parse_args()
@@ -44,8 +53,8 @@ set_gpu(args.gpu_id)
 
 USE_SYNTHETIC = args.use_real == 0
 
-sam_checkpoint = "sam_vit_h_4b8939.pth"
-model_type = "vit_h"
+# sam_checkpoint = args.sam_checkpoint
+# model_type = args.model_type
 device = "cuda"
 
 # Directorio para guardar las segmentaciones
@@ -74,7 +83,8 @@ print("df shape", df.shape)
 print("herida_0 shape", image_size)
 
 # setup SAM
-mask_generator, predictor = setup_sam(sam_checkpoint, model_type, device)
+mask_generator, predictor = setup_sam("sam/sam_vit_b_01ec64.pth", "vit_b", device)
+mask_generator_last_steps, predictor_last_steps = setup_sam("sam/medsam_tune_mask_decoder.pth", "vit_b", device)
 
 
 # includes = [image_size[1]//2,image_size[0]//2]
@@ -120,14 +130,16 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                 # masks = mask_generator.generate(image_array)
 
                 if (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-1) or ((cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-2)):
-                    input_boxes = np.array([image_size[1]//2-100, 0, image_size[1]//2+100, image_size[0]])
+                    input_boxes = np.array([image_size[1]//2-250, 0, image_size[1]//2+250, image_size[0]])
+                    masks, scores, logits = predict_masks(predictor_last_steps, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
                 elif t+1 == utils.len_cell_type_time_step(cell_type) or ((cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-1)):
                     input_boxes = np.array([image_size[1]//2-100, 0, image_size[1]//2+100, image_size[0]])
+                    masks, scores, logits = predict_masks(predictor_last_steps, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
                 else:
                     input_boxes = np.array([image_size[1]//3, 0, image_size[1]-image_size[1]//3, image_size[0]])
+                    masks, scores, logits = predict_masks(predictor, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
 
 
-                masks, scores, logits = predict_masks(predictor, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
                 print("len mask:", len(masks))
 
                 if len(masks) == 0:
