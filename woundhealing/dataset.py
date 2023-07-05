@@ -2,7 +2,7 @@
 Contains functions for loading the wound dataset.
 
 (c) All rights reserved.
-original authors: Francisco M. Garcia-Moreno, Miguel Ángel Gutiérrez-Naranjo. 2023.
+original authors: Francisco M. Garcia-Moreno. 2023.
 
 Source code:
 https://github.com/frangam/wound-healing
@@ -111,7 +111,7 @@ def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_fra
     return dataset
 
 
-def split_dataset(dataset, train_ratio=0.9):
+def split_dataset(dataset, train_ratio=0.9, seed=33):
     """
     Split dataset into training and validation sets.
 
@@ -122,6 +122,7 @@ def split_dataset(dataset, train_ratio=0.9):
     Returns:
     Tuple[np.array, np.array]: The training and validation datasets.
     """
+    np.random.seed(seed)
     indexes = np.arange(dataset.shape[0])
     np.random.shuffle(indexes)
     train_index = indexes[: int(train_ratio * dataset.shape[0])]
@@ -141,6 +142,7 @@ def normalize_data(dataset):
     Returns:
     np.array: The normalized dataset.
     """
+    print(dataset.shape)
     return dataset / 255
 
 def create_shifted_frames(data):

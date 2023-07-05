@@ -2,7 +2,7 @@
 Contains functions for building deep learning models.
 
 (c) All rights reserved.
-original authors: Francisco M. Garcia-Moreno, Miguel Ángel Gutiérrez-Naranjo. 2023.
+original authors: Francisco M. Garcia-Moreno. 2023.
 
 Source code:
 https://github.com/frangam/wound-healing
@@ -11,18 +11,35 @@ Please see LICENSE.md for the full license document:
 https://github.com/frangam/wound-healing/LICENSE.md
 """
 
+import numpy as np
 import tensorflow as tf
 
 from tensorflow import keras
 
-from tensorflow.keras.layers import ConvLSTM2D, GRU, BatchNormalization, Conv3D, Input, Reshape, UpSampling2D, Concatenate, MaxPooling2D, Conv2D, TimeDistributed
+from tensorflow.keras.layers import ConvLSTM2D, GRU, BatchNormalization, Conv3D, Input, Reshape, UpSampling2D, Concatenate, MaxPooling2D, Conv2D, TimeDistributed, Lambda, MaxPooling3D, Add, LSTM, Conv2DTranspose, Flatten, Dense
 from tensorflow.keras.models import Model
 from tensorflow.keras import layers
+from keras.activations import softmax
+
+from skimage.metrics import structural_similarity as ssim
+
+import keras.backend as K
+
+def scale_weights(output, scale):
+    return output * K.constant(scale)
+
+def mse(y_true, y_pred):
+    return K.mean(K.square(y_pred - y_true), axis=-1)
+
+def psnr(y_true, y_pred):
+    max_pixel = 1.0
+    return 10.0 / tf.math.log(10.0) * (tf.math.log(max_pixel ** 2 / K.mean(K.square(y_pred - y_true), axis=-1)))
+
+def ssim(y_true, y_pred):
+    return tf.image.ssim(y_true, y_pred, max_val=1.0)
 
 
-
-
-def create_model(input_shape, architecture, num_layers):
+def create_model(input_shape, architecture, num_layers=3):
     """
     Create and compile a Convolutional LSTM or GRU model based on the selected architecture and number of layers.
 
@@ -36,26 +53,302 @@ def create_model(input_shape, architecture, num_layers):
     """
 
     if architecture == 0:
-        model = architecture_conv_lstm(input_shape, num_layers)
+        model = architecture_conv_lstm(input_shape[2:], num_layers=1) # architecture_conv_lstm(input_shape[2:], num_layers)
     elif architecture == 1:
-        # model = architecture_gru(input_shape, num_layers)
-        model = architecture_bidirectional_conv_lstm_unet(input_shape, num_layers)
+        model = model = architecture_conv_lstm(input_shape[2:], num_layers=3)
+    elif architecture == 2:
+        model = model = architecture_conv_lstm(input_shape[2:], num_layers=6)
     elif architecture == 3:
-        model = architecture_bidirectional_gru(input_shape, num_layers)
+        model = arch_1(input_shape[2:]) 
     elif architecture == 4:
-        model = architecture_conv3d_conv2d(input_shape, num_layers)
+        model = arch_2(input_shape[2:]) 
+        # model = architecture_gru(input_shape, num_layers)
+        # model = architecture_conv3d_conv2d(input_shape[2:], num_layers)
+    elif architecture == 5:
+        model = arch_3(input_shape[2:]) 
+    elif architecture == 6:
+        model = arch_4(input_shape[2:]) 
+    elif architecture == 7:
+        model = arch_5(input_shape[2:]) 
+    elif architecture == 8:
+        model = residual_conv_lstm(input_shape[2:], num_layers=3, num_filters=64, dropout_rate_list=[0.3,0.3,0.3])
+    elif architecture == 9: #BEST #91.32 SSIM
+        model = residual_conv_lstm(input_shape[2:], num_layers=6, num_filters=64, dropout_rate_list=[0.3,0.3,0.3,0.3,0.3,0.3])
+    elif architecture == 10:
+        model = residual_conv_lstm(input_shape[2:], num_layers=9, num_filters=64, dropout_rate_list=[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3])
+    elif architecture == 11:
+        model = residual_conv_lstm(input_shape[2:], num_layers=3, num_filters=32, dropout_rate_list=[0.1,0.1,0.3])
+    elif architecture == 12: #90.4% SSIM
+        model = residual_conv_lstm(input_shape[2:], num_layers=3, num_filters=128, dropout_rate_list=[0.1,0.1,0.1])
+    elif architecture == 13: #90.02% SSIM
+        model = residual_conv_lstm(input_shape[2:], num_layers=4, num_filters=128, dropout_rate_list=[0.3,0.3,0.3,0.3])
+    elif architecture == 14: #81.68% SSIM
+        model = residual_conv_lstm_par(input_shape[2:], num_layers=4, num_filters_list=[64,64,64,64], dropout_rate=0.3)
+    elif architecture == 15:
+        model = residual_conv_lstm(input_shape[2:], num_layers=3, num_filters=256, dropout_rate_list=[0.3,0.3,0.3])
+    elif architecture == 16: #0.8627 SSIM
+        model = architecture_fcn_2p_lstm(input_shape[2:])
+    elif architecture == 17: #0.8806 SSIM
+        model = arch_6(input_shape[2:])
+    elif architecture == 18:
+        model = arch_7(input_shape[2:])
+    elif architecture == 19:
+        model = arch_transformer(input_shape[2:])
+    elif architecture == 20:
+        model = arch_transformer_2(input_shape[2:])
     else:
         raise ValueError("Invalid architecture index.")
 
+    model.summary()
+    
     # Compile the model
     model.compile(
-        loss=keras.losses.binary_crossentropy, optimizer=keras.optimizers.Adam()
+        loss=keras.losses.binary_crossentropy, optimizer=keras.optimizers.Adam(), metrics=[mse, psnr, ssim]
     )
 
     return model
 
 
-def architecture_conv_lstm(input_shape, num_layers):
+
+def architecture_fcn_2p_lstm(input_shape, c=64):
+    input_image = Input(shape=(None, *input_shape), name="input")
+    x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(input_image)
+    x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c1 = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+
+    x = TimeDistributed(MaxPooling2D((2, 2), strides=(2, 2)))(c1)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c2 = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+
+    x = TimeDistributed(MaxPooling2D((2, 2), strides=(2, 2)))(c2)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c3 = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+
+    x = TimeDistributed(UpSampling2D((2, 2)))(c3)
+    x = Concatenate()([c2, x])
+    x = TimeDistributed(Conv2D(c, (3, 3), padding="same", activation="relu"))(x)
+
+    x = TimeDistributed(UpSampling2D((2, 2)))(x)
+    x = Concatenate()([c1, x])
+    x = TimeDistributed(Conv2D(3, (3, 3), padding="same", activation="relu"))(x)
+
+    output = TimeDistributed(Conv2D(input_shape[-1], (3, 3), padding="same", activation="sigmoid", name="output"))(x)
+    output = Lambda(scale_weights, arguments={'scale': 1.0})(output)
+
+    model = Model(inputs=input_image, outputs=[output])
+    
+    return model
+
+def arch_0(input_shape):
+    '''Arquitectura básica Conv3DLSTM'''
+    input_layer = Input(shape=(None, *input_shape))
+    x = ConvLSTM2D(filters=64, kernel_size=(3, 3, 3), padding='same', return_sequences=True)(input_layer)
+    x = BatchNormalization()(x)
+    x = Conv3D(filters=input_shape[-1], kernel_size=(3, 3, 3), activation='sigmoid', padding='same')(x)
+    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+    model = Model(inputs=input_layer, outputs=x)
+    return model
+
+def arch_1(input_shape):
+    '''Arquitectura con capas adicionales de reducción dimensional'''
+    input_layer = Input(shape=(None, *input_shape))
+    x = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(input_layer)
+    x = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(x)
+    x = Conv3D(filters=input_shape[-1], kernel_size=(3, 3, 3), activation='sigmoid', padding='same')(x)
+    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+    model = Model(inputs=input_layer, outputs=x)
+    return model
+
+def arch_2(input_shape):
+    '''Arquitectura de red en cascada'''
+    input_layer = Input(shape=(None, *input_shape))
+    x1 = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(input_layer)
+    x2 = ConvLSTM2D(filters=32, kernel_size=(3, 3), padding='same', return_sequences=True)(x1)
+    x = Concatenate(axis=-1)([x1, x2])
+    x = Conv3D(filters=input_shape[-1], kernel_size=(3, 3, 3), activation='sigmoid', padding='same')(x)
+    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+    model = Model(inputs=input_layer, outputs=x)
+    return model
+
+def arch_3(input_shape):
+    '''Arquitectura con capas ConvLSTM2D intercaladas con capas Conv2D'''
+    input_layer = Input(shape=(None, *input_shape))
+    x = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(input_layer)
+    x = Conv2D(filters=32, kernel_size=(3, 3), activation='relu', padding='same')(x)
+    x = ConvLSTM2D(filters=32, kernel_size=(3, 3), padding='same', return_sequences=True)(x)
+    x = Conv3D(filters=input_shape[-1], kernel_size=(3, 3, 3), activation='sigmoid', padding='same')(x)
+    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+    model = Model(inputs=input_layer, outputs=x)
+    return model
+
+def arch_4(input_shape):
+    '''Arquitectura con residuos (Residual Network)'''
+    input_layer = Input(shape=(None, *input_shape))
+    x = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(input_layer)
+    x = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(x)
+    res = Add()([input_layer, x])
+    x = Conv3D(filters=input_shape[-1], kernel_size=(3, 3, 3), activation='sigmoid', padding='same')(res)
+    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+    model = Model(inputs=input_layer, outputs=x)
+
+    return model
+
+
+def arch_5(input_shape):
+    '''Arquitectura de múltiples caminos (Multi-Path Network)'''
+    input_layer = Input(shape=(None, *input_shape))
+    x1 = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(input_layer)
+    x2 = ConvLSTM2D(filters=64, kernel_size=(5, 5), padding='same', return_sequences=True)(input_layer)
+    x = Concatenate(axis=-1)([x1, x2])
+    x = Conv3D(filters=input_shape[-1], kernel_size=(3, 3, 3), activation='sigmoid', padding='same')(x)
+    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+    model = Model(inputs=input_layer, outputs=x)
+
+    return model
+
+def arch_6(input_shape):
+    '''Arquitectura con Conv2DTranspose en lugar de Conv3D'''
+
+    '''ConvLSTM2D con Conv2DTranspose: En lugar de utilizar capas Conv3D 
+    para la salida, usar capas Conv2DTranspose para incrementar 
+    la dimensión espacial de la salida, que puede ser útil 
+    si las capas intermedias reducen la dimensión espacial.'''
+    input_layer = Input(shape=(None, *input_shape))
+    x = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(input_layer)
+    x = ConvLSTM2D(filters=32, kernel_size=(3, 3), padding='same', return_sequences=True)(x)
+    x = TimeDistributed(Conv2DTranspose(filters=input_shape[-1], kernel_size=(3, 3), activation='sigmoid', padding='same'))(x)
+    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+    model = Model(inputs=input_layer, outputs=x)
+    return model
+
+def arch_7(input_shape):
+    '''Arquitectura con TimeDistributed(Dense) y LSTM al final'''
+
+    '''TimeDistributed(Dense()): probar con un enfoque diferente y utilizar 
+    una red completamente conectada en lugar de una convolucional 
+    para procesar cada frame del video por separado, 
+    luego combinar la información temporal al final con capas LSTM.'''
+    input_layer = Input(shape=(None, *input_shape))
+    x = TimeDistributed(Flatten())(input_layer)
+    x = TimeDistributed(Dense(64, activation='relu'))(x)
+    x = LSTM(32, return_sequences=True)(x)
+    x = TimeDistributed(Dense(input_shape[0]*input_shape[1]*input_shape[2], activation='sigmoid'))(x)
+    x = TimeDistributed(Reshape((input_shape[0], input_shape[1], input_shape[2])))(x)
+    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+    model = Model(inputs=input_layer, outputs=x)
+    return model
+
+
+def residual_conv_lstm(input_shape, num_layers=3, num_filters=64, dropout_rate_list=[0.3,0.3,0.3], activation="relu"):
+    assert len(dropout_rate_list) == num_layers, "Debe proporcionar un valor para cada capa"
+
+    inp = Input(shape=(None, *input_shape))
+
+    # Primer bloque ConvLSTM
+    x = ConvLSTM2D(
+        filters=num_filters,
+        kernel_size=(3, 3),
+        padding="same",
+        return_sequences=True,
+        activation=activation,
+        dropout=dropout_rate_list[0],
+        recurrent_dropout=dropout_rate_list[0], 
+        name="conv_lstm2d_1"
+    )(inp)
+
+    for i in range(1, num_layers):
+        # Bloques residuales
+        x_residual = x
+
+        x = ConvLSTM2D(
+            filters=num_filters,
+            kernel_size=(3, 3),
+            padding="same",
+            return_sequences=True,
+            activation=activation,
+            dropout=dropout_rate_list[i],
+            recurrent_dropout=dropout_rate_list[i], 
+            name=f"conv_lstm2d_{i+1}"
+        )(x)
+
+        # # Adaptar las dimensiones de los canales para la conexión residual
+        # x_residual = Conv2D(filters=num_filters_list[i], kernel_size=(1, 1), padding='same', activation='relu')(x_residual)
+
+
+        # Conexión residual
+        x = Add()([x, x_residual])
+
+    # Capa de salida
+    x = Conv3D(
+        filters=input_shape[-1],
+        kernel_size=(3, 3, 3),
+        activation="sigmoid",
+        padding="same",
+    )(x)
+    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+    model = Model(inp, x)
+    return model
+
+def residual_conv_lstm_par(input_shape, num_layers, num_filters_list, dropout_rate=0.3, activation="relu"):
+    assert len(num_filters_list) == num_layers, "Debe proporcionar un valor para cada capa"
+
+    inp = Input(shape=(None, *input_shape))
+
+    # Primer bloque ConvLSTM
+    x = ConvLSTM2D(
+        filters=num_filters_list[0],
+        kernel_size=(3, 3),
+        padding="same",
+        return_sequences=True,
+        activation=activation,
+        dropout=dropout_rate,
+        recurrent_dropout=dropout_rate,
+        name="conv_lstm2d_1"
+    )(inp)
+
+    for i in range(1, num_layers):
+        # Bloques residuales
+        x_residual = x
+        x = ConvLSTM2D(
+            filters=num_filters_list[i],
+            kernel_size=(3, 3),
+            padding="same",
+            return_sequences=True,
+            activation=activation,
+            dropout=dropout_rate,
+            recurrent_dropout=dropout_rate,
+            name=f"conv_lstm2d_{i+1}"
+        )(x)
+
+        # Conexión residual solo en ciertos bloques
+        if i % 2 == 0:
+            x = Add()([x, x_residual])
+
+    # Capa de salida
+    x = Conv3D(
+        filters=input_shape[-1],
+        kernel_size=(3, 3, 3),
+        activation="sigmoid",
+        padding="same"
+    )(x)
+    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+    model = Model(inp, x)
+    return model
+
+
+def architecture_conv_lstm(input_shape, num_layers, scaling_factor=1.0):
     """
     Combined Architecture: Multiple ConvLSTM2D layers followed by Conv3D layers.
 
@@ -69,17 +362,18 @@ def architecture_conv_lstm(input_shape, num_layers):
     inp = Input(shape=(None, *input_shape))
     x = inp
 
-    for _ in range(num_layers):
+    for i in range(num_layers):
         x = ConvLSTM2D(
             filters=64,
             kernel_size=(3, 3),
             padding="same",
             return_sequences=True,
             activation="relu",
-            dropout=0.3,
-            recurrent_dropout=0.3
+            # dropout=0.3,
+            # recurrent_dropout=0.3, 
+            name=f"conv_lstm2d_{i+1}"
         )(x)
-        x = BatchNormalization()(x)
+        # x = BatchNormalization()(x)
 
     x = Conv3D(
         filters=input_shape[-1],
@@ -87,6 +381,9 @@ def architecture_conv_lstm(input_shape, num_layers):
         activation="sigmoid",
         padding="same",
     )(x)
+
+    # Aplicar weight scaling a la última capa
+    x = Lambda(scale_weights, arguments={'scale': scaling_factor})(x)
 
     model = Model(inp, x)
     return model
@@ -235,4 +532,147 @@ def architecture_conv3d_conv2d(input_shape, num_layers):
 
     model = Model(inp, x)
     return model
+
+
+
+
+
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+
+# Capa de atención multi-cabeza
+class MultiHeadSelfAttention(layers.Layer):
+    def __init__(self, embed_dim, num_heads=8):
+        super(MultiHeadSelfAttention, self).__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        if embed_dim % num_heads != 0:
+            raise ValueError(
+                f"embedding dimension = {embed_dim} should be divisible by number of heads = {num_heads}"
+            )
+        self.projection_dim = embed_dim // num_heads
+        self.query_dense = layers.Dense(embed_dim)
+        self.key_dense = layers.Dense(embed_dim)
+        self.value_dense = layers.Dense(embed_dim)
+        self.combine_heads = layers.Dense(embed_dim)
+
+    def attention(self, query, key, value):
+        score = tf.matmul(query, key, transpose_b=True)
+        dim_key = tf.cast(tf.shape(key)[-1], tf.float32)
+        scaled_score = score / tf.math.sqrt(dim_key)
+        weights = tf.nn.softmax(scaled_score, axis=-1)
+        output = tf.matmul(weights, value)
+        return output, weights
+
+    def separate_heads(self, x, batch_size):
+        x = tf.reshape(x, (batch_size, -1, self.num_heads, self.projection_dim))
+        return tf.transpose(x, perm=[0, 2, 1, 3])
+
+    def call(self, inputs):
+        batch_size = tf.shape(inputs)[0]
+        query = self.query_dense(inputs)
+        key = self.key_dense(inputs)
+        value = self.value_dense(inputs)
+        query = self.separate_heads(query, batch_size)
+        key = self.separate_heads(key, batch_size)
+        value = self.separate_heads(value, batch_size)
+        attention, weights = self.attention(query, key, value)
+        attention = tf.transpose(attention, perm=[0, 2, 1, 3])
+        concat_attention = tf.reshape(attention, (batch_size, -1, self.embed_dim))
+        output = self.combine_heads(concat_attention)
+        return output
+
+class TransformerBlock(layers.Layer):
+    def __init__(self, num_heads, ff_dim, rate=0.1, embed_dim=65536, name="transformer_block"):
+        super(TransformerBlock, self).__init__(name=name)
+        self.att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
+        self.ffn = keras.Sequential(
+            [layers.Dense(ff_dim, activation="relu"), layers.Dense(embed_dim),]
+        )
+        self.layernorm1 = layers.LayerNormalization(epsilon=1e-6)
+        self.layernorm2 = layers.LayerNormalization(epsilon=1e-6)
+        self.dropout1 = layers.Dropout(rate)
+        self.dropout2 = layers.Dropout(rate)
+
+        # Additional layer to adjust the shape of out1
+        self.reshape_out1 = layers.TimeDistributed(layers.Dense(embed_dim))
+
+    def call(self, inputs, training):
+        attn_output = self.att(inputs, inputs)
+        attn_output = self.dropout1(attn_output, training=training)
+        out1 = self.layernorm1(inputs + attn_output)
+        out1 = self.reshape_out1(out1)  # Adjust the shape of out1
+        ffn_output = self.ffn(out1)
+        ffn_output = self.dropout2(ffn_output, training=training)
+
+        # Print tensor shapes
+        print(f"out1 shape: {out1.shape}")
+        print(f"ffn_output shape: {ffn_output.shape}")
+
+        return self.layernorm2(out1 + ffn_output)
+
+
+
+
+
+
+def arch_transformer(input_shape):
+    embed_dim = 64  # Embedding size for each token
+    num_heads = 2  # Number of attention heads
+    ff_dim = 32  # Hidden layer size in feed forward network inside transformer
+
+    # Input layer
+    inputs = layers.Input(shape=(None, *input_shape))
+
+    # Use a Conv2D layer to reduce the dimension of the image
+    x = layers.TimeDistributed(layers.Conv2D(embed_dim, kernel_size=(3, 3), strides=(2, 2), padding='same'))(inputs)
+    x = layers.Reshape((-1, np.prod(x.shape[2:])))(x)
+
+    # Transformer block
+    transformer_block = TransformerBlock(num_heads, ff_dim, 0.1, embed_dim)
+    x = transformer_block(x)
+
+    # Decoding layers to reconstruct the image
+    x = layers.Dense(16*16*64, activation='relu')(x)  # adjust these dimensions as needed
+    x = layers.Reshape((-1, 16, 16, 64))(x)
+
+    x = layers.TimeDistributed(layers.Conv2DTranspose(32, (3, 3), strides=(2, 2), padding='same', activation='relu'))(x)
+    x = layers.TimeDistributed(layers.Conv2DTranspose(1, (3, 3), strides=(2, 2), padding='same', activation='sigmoid'))(x)
+
+    model = keras.Model(inputs=inputs, outputs=x)
+
+    return model
+
+
+def arch_transformer_2(input_shape):
+    embed_dim = 64  # Embedding size for each token
+    num_heads = 4  # Number of attention heads
+    ff_dim = 128  # Hidden layer size in feed forward network inside transformer
+    num_blocks = 4  # Number of transformer blocks
+
+    # Input layer
+    inputs = layers.Input(shape=(None, *input_shape))
+
+    # Use a Conv2D layer to reduce the dimension of the image
+    x = layers.TimeDistributed(layers.Conv2D(embed_dim, kernel_size=(3, 3), strides=(2, 2), padding='same'))(inputs)
+    x = layers.Reshape((-1, np.prod(x.shape[2:])))(x)
+
+    # Transformer blocks
+    for _ in range(num_blocks):
+        transformer_block = TransformerBlock(num_heads, ff_dim, 0.1, embed_dim)
+        x = transformer_block(x)
+
+    # Decoding layers to reconstruct the image
+    x = layers.Dense(16*16*64, activation='relu')(x)  # adjust these dimensions as needed
+    x = layers.Reshape((-1, 16, 16, 64))(x)
+
+    x = layers.TimeDistributed(layers.Conv2DTranspose(32, (3, 3), strides=(2, 2), padding='same', activation='relu'))(x)
+    x = layers.TimeDistributed(layers.Conv2DTranspose(1, (3, 3), strides=(2, 2), padding='same', activation='sigmoid'))(x)
+
+    model = keras.Model(inputs=inputs, outputs=x)
+
+    return model
+
+
 

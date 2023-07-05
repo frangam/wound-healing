@@ -4,7 +4,7 @@
 Contains functions for running the segmentation of wound images.
 
 (c) All rights reserved.
-original authors: Francisco M. Garcia-Moreno, Miguel Ángel Gutiérrez-Naranjo. 2023.
+original authors: Francisco M. Garcia-Moreno. 2023.
 
 Source code:
 https://github.com/frangam/wound-healing
@@ -103,6 +103,9 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
         if column.startswith('WoundMatrix_'): #wounds in a time step t=i; WoundMatrix_0 (t=0); WoundMatrix_1 (t=1)...
             # print("row", row)
             wound_matrix = row[column] #it is a str like this: "[(250, 743, 0), (250, 742, 1), (250, 743, 2), ...]"
+            if pd.isna(wound_matrix):
+                break
+            
             if not pd.isna(wound_matrix):
                 if USE_SYNTHETIC:
                     wound_matrix = eval(wound_matrix) #convert to list
@@ -116,33 +119,37 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                 # areas, perimeters = generar_segmentacion_herida(image_array, sam_checkpoint, model_type, device)
                 # masks = mask_generator.generate(image_array)
 
-                if t+1 == utils.len_cell_type_time_step(cell_type)-1:
-                    input_boxes = np.array([image_size[1]//2-200, 0, image_size[1]//2+200, image_size[0]])
-                elif t+1 == utils.len_cell_type_time_step(cell_type):
+                if (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-1) or ((cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-2)):
+                    input_boxes = np.array([image_size[1]//2-100, 0, image_size[1]//2+100, image_size[0]])
+                elif t+1 == utils.len_cell_type_time_step(cell_type) or ((cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-1)):
                     input_boxes = np.array([image_size[1]//2-100, 0, image_size[1]//2+100, image_size[0]])
                 else:
                     input_boxes = np.array([image_size[1]//3, 0, image_size[1]-image_size[1]//3, image_size[0]])
 
 
                 masks, scores, logits = predict_masks(predictor, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
-                area, perimeter = get_area_perimeter(image_array, args.pixel_size)
-
                 print("len mask:", len(masks))
 
-                new_ids.append(cell_id)
-                new_cell_types.append(cell_type)
-                new_times.append(t)
-                new_areas.append(area)  # Asegúrate de que `areas` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
-                new_perimeters.append(perimeter)  # Asegúrate de que `perimeters` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
-
+                if len(masks) == 0:
+                    break
                 
-                #save original image
-                path1 = f"{seg_path}/original/"
-                os.makedirs(path1, exist_ok=True)
-                cv2.imwrite(os.path.join(path1, f"{cell_id}_type_{cell_type}_complete_image_{t+1}.png"), image_array)
-                # cv2.imwrite(os.path.join(seg_path, f"{cell_id}_type_{cell_type}_segmentation_{t+1}.png"), masks)
-
                 if len(masks) > 1:
+                    area, perimeter = get_area_perimeter(image_array, args.pixel_size)
+
+                    new_ids.append(cell_id)
+                    new_cell_types.append(cell_type)
+                    new_times.append(t)
+                    new_areas.append(area)  # Asegúrate de que `areas` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
+                    new_perimeters.append(perimeter)  # Asegúrate de que `perimeters` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
+
+                    
+                    #save original image
+                    path1 = f"{seg_path}/original/"
+                    os.makedirs(path1, exist_ok=True)
+                    cv2.imwrite(os.path.join(path1, f"{cell_id}_type_{cell_type}_complete_image_{t+1}.png"), image_array)
+                    # cv2.imwrite(os.path.join(seg_path, f"{cell_id}_type_{cell_type}_segmentation_{t+1}.png"), masks)
+
+
                     worse_score =+2
                     best_score =-1
                     best_mask_id = 0
@@ -167,9 +174,9 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                         plt.close(fig)
                     
                     #select the best fit for the mask, depending on the time in our case 
-                    if t+1 == utils.len_cell_type_time_step(cell_type):
+                    if t+1 == utils.len_cell_type_time_step(cell_type) or (cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-1):
                         best_mask = masks[worse_mask_id] #en ultimo frame preferimos la primera mask
-                    elif t+1 == utils.len_cell_type_time_step(cell_type)-1:
+                    elif (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-1) and (cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-2):
                         best_mask = masks[1] #en el penultimo frame, preferimos la 2ª mask
                     else:
                         best_mask = masks[best_mask_id] #ultima mask (best score) en los demás casos

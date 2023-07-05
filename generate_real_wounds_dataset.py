@@ -4,7 +4,7 @@
 Contains functions for generating real wound dataset from images.
 
 (c) All rights reserved.
-original authors: Francisco M. Garcia-Moreno, Miguel Ángel Gutiérrez-Naranjo. 2023.
+original authors: Francisco M. Garcia-Moreno. 2023.
 
 Source code:
 https://github.com/frangam/wound-healing
@@ -33,7 +33,7 @@ def main():
     W.utils.set_gpu(args.gpu_id)
 
     MONOLAYER = [0, 3, 6, 9, 12, 24, 27]
-    SPHERES = [0, 3, 6, 9, 12, 15]
+    SPHERES = [0, 3, 6, 9, 12, 18, 24]
 
 
 
@@ -44,25 +44,40 @@ def main():
     print(os.listdir(directory))
     monolayer_wound_lists = [
         [
-            cv.imread(os.path.join(directory, folder, f"image_{i}.tif"))
-            for i in range(len(os.listdir(os.path.join(directory, folder))))
-            if not str(i).startswith(".DS_Store")  # Excluir archivo .DS_Store
+            cv.imread(os.path.join(directory, folder, file))
+            for file in sorted(os.listdir(os.path.join(directory, folder)))
+            if not file.startswith(".DS_Store")
         ]
         for folder in os.listdir(directory)
-        if os.path.isdir(os.path.join(directory, folder))
+        if not str(folder).startswith(".DS_Store") and os.path.isdir(os.path.join(directory, folder))  
     ]
-
-    print(np.array(monolayer_wound_lists[0][0]).shape)
-   
+    for w in monolayer_wound_lists:
+        print(np.array(w).shape)
+    print("monolayer_wound_lists shape", np.array(monolayer_wound_lists).shape)
 
     directory = f"{args.path}real_spheres"
-    # sphere_wound_lists = [[cv.imread(os.path.join(directory, folder, f"imagen_{i}.tiff")) for i in range(len(os.listdir(os.path.join(directory, folder))))]
-    #           for folder in os.listdir(directory) if os.path.isdir(os.path.join(directory, folder))]
+    print([folder for folder in sorted(os.listdir(directory)) if not str(folder).startswith(".DS_Store") and os.path.isdir(os.path.join(directory, folder)) ])
+    sphere_wound_lists = [
+        [
+            cv.imread(os.path.join(directory, folder, file))
+            for file in sorted(os.listdir(os.path.join(directory, folder)))
+            if not file.startswith(".DS_Store")
+        ]
+        for folder in os.listdir(directory)
+        if not str(folder).startswith(".DS_Store") and os.path.isdir(os.path.join(directory, folder))  
+    ]
+    
+    print("sphere_wound_lists shape", np.array(sphere_wound_lists).shape)
+
+    for w in sphere_wound_lists:
+        print(np.array(w).shape)   
 
 
     for i in tqdm(range(len(monolayer_wound_lists))):
         monolayer_wounds = monolayer_wound_lists[i]
         monolayer_df = pd.DataFrame()
+        print("monolayer_wounds shape", np.array(monolayer_wounds).shape)
+
         for j, wound in tqdm(enumerate(monolayer_wounds), desc=f"Generating wounds for Monolayer {i+1}"):
             column_name = f'WoundMatrix_{j}'
             monolayer_df[column_name] = [pickle.dumps(wound)]
@@ -73,17 +88,37 @@ def main():
         
         # Agregar los DataFrames a la lista
         wound_df_list.append(monolayer_df)
-    
+
+    for i in tqdm(range(len(sphere_wound_lists))):
+        wounds = sphere_wound_lists[i]
+        print("i:", i+1)
+        print("wounds shape", np.array(wounds).shape)
+
+        df = pd.DataFrame()
+        for j, wound in tqdm(enumerate(wounds), desc=f"Generating wounds for Sphere {i+1}"):
+            column_name = f'WoundMatrix_{j}'
+            df[column_name] = [pickle.dumps(wound)]
+        
+        # Asignar ID y tipo de célula en los DataFrames
+        df['ID'] = f'Sphere_{i+1}'
+        df['CellType'] = 1
+        
+        # Agregar los DataFrames a la lista
+        wound_df_list.append(df)
+
+
     combined_df = pd.concat(wound_df_list, ignore_index=True)
 
     # Guardar el DataFrame combinado en un archivo pickle
     combined_df.to_pickle(f"{args.path}/combined_real_wounds.pkl")
 
     # Imprimir el DataFrame
-    print(combined_df.head())
+    print("head", combined_df.head())
     print("Shape of the combined DataFrame:", combined_df.shape)
 
-    
+
+    print("tail", combined_df.tail())
+
 
 
 if __name__ == '__main__':

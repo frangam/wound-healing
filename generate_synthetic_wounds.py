@@ -4,7 +4,7 @@
 Contains functions for generating synthetic wound creation and healing.
 
 (c) All rights reserved.
-original authors: Francisco M. Garcia-Moreno, Miguel Ángel Gutiérrez-Naranjo. 2023.
+original authors: Francisco M. Garcia-Moreno. 2023.
 
 Source code:
 https://github.com/frangam/wound-healing
@@ -36,7 +36,7 @@ def main():
     IMG_WIDTH = args.w
     IMG_HEIGHT = args.h
     
-    MONOLAYER = [0, 3, 6, 9, 12, 24, 27, 30]
+    MONOLAYER = [0, 3, 6, 9, 12, 24, 27]
     SPHERES = [0, 3, 6, 9, 12, 15, 18]
 
     # Pick a random start point

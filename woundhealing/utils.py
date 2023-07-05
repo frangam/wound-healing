@@ -4,7 +4,7 @@ import tifffile
 
 
 MONOLAYER = [0, 3, 6, 9, 12, 24, 27]
-SPHERES = [0, 3, 6, 9, 12, 15]
+SPHERES = [0, 3, 6, 9, 12, 18, 24]
 CELL_TYPES = {0: MONOLAYER, 1: SPHERES}
 
 def len_cell_type_time_step(celltype=0):

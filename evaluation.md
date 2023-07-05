@@ -1,3 +1,31 @@
+## SSIM
+
+Including the original frames in every prediction
+
+```
+./ssim.py --base results/next-image/synthetic/model_9/include_originals/
+```
+
+only predictions
+
+```
+./ssim.py --base results/next-image/synthetic/model_9/no_include_originals_only_predictions/
+```
+
+** For assessing real images:
+
+-- including the original frames in every prediction
+
+```
+./ssim.py --base results/next-image/real/model_9/include_originals/
+```
+
+-- only predictions
+
+```
+./ssim.py --base results/next-image/real/model_9/no_include_originals_only_predictions/
+```
+
 
 ## Install pytorch-fid
 
