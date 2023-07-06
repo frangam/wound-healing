@@ -130,14 +130,21 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                 # masks = mask_generator.generate(image_array)
 
                 if (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-1) or ((cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-2)):
-                    input_boxes = np.array([image_size[1]//2-250, 0, image_size[1]//2+250, image_size[0]])
+                    input_boxes = np.array([image_size[1]//2-300, 0, image_size[1]//2+300, image_size[0]])
                     masks, scores, logits = predict_masks(predictor_last_steps, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
                 elif t+1 == utils.len_cell_type_time_step(cell_type) or ((cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-1)):
-                    input_boxes = np.array([image_size[1]//2-100, 0, image_size[1]//2+100, image_size[0]])
+                    input_boxes = np.array([image_size[1]//2-120, 0, image_size[1]//2+120, image_size[0]])
                     masks, scores, logits = predict_masks(predictor_last_steps, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
                 else:
-                    input_boxes = np.array([image_size[1]//3, 0, image_size[1]-image_size[1]//3, image_size[0]])
+                    input_boxes = np.array([image_size[1]//3-50, 0, image_size[1]-image_size[1]//3+50, image_size[0]])
                     masks, scores, logits = predict_masks(predictor, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
+
+                # Get the indices that would sort `scores`
+                sort_indices = np.argsort(scores)[::-1] #descending
+                # Use these indices to sort `masks`, `scores`, and `logits`
+                masks = masks[sort_indices]
+                scores = scores[sort_indices]
+                logits = logits[sort_indices]
 
 
                 print("len mask:", len(masks))
@@ -185,13 +192,17 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                         plt.savefig(os.path.join(path1_1, f"{cell_id}_type_{cell_type}_segmentation_mask_{k}_{t+1}.png"), bbox_inches='tight', pad_inches=0)
                         plt.close(fig)
                     
+                    print("utils.len_cell_type_time_step(cell_type)", utils.len_cell_type_time_step(cell_type))
                     #select the best fit for the mask, depending on the time in our case 
                     if t+1 == utils.len_cell_type_time_step(cell_type) or (cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-1):
-                        best_mask = masks[worse_mask_id] #en ultimo frame preferimos la primera mask
-                    elif (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-1) and (cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-2):
-                        best_mask = masks[1] #en el penultimo frame, preferimos la 2ª mask
+                        print(f"[Cell type: {cell_type}]", "t:", t+1, "selecting first mask", f"[Score: {scores[-1]}]")
+                        best_mask = masks[0] #first mask
+                    elif (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-1) or (cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-2):
+                        print(f"[Cell type: {cell_type}]", "t:", t+1, "selecting middle mask", f"[Score: {scores[1]}]")
+                        best_mask = masks[1] #second mask
                     else:
-                        best_mask = masks[best_mask_id] #ultima mask (best score) en los demás casos
+                        print(f"[Cell type: {cell_type}]", "t:", t+1, "selecting first mask", f"[Score: {scores[0]}]")
+                        best_mask = masks[0] #first mask
 
                     #segmentations showing points
                     path2 = f"{seg_path}/points/"
