@@ -1,5 +1,19 @@
 #!venv/bin/python3
 
+"""
+Contains functions for loading the wound dataset.
+
+(c) All rights reserved.
+original authors: Francisco M. Garcia-Moreno. 2023.
+
+Source code:
+https://github.com/frangam/wound-healing
+
+Please see LICENSE.md for the full license document:
+https://github.com/frangam/wound-healing/LICENSE.md
+"""
+
+
 import os
 import numpy as np
 import pandas as pd
@@ -8,6 +22,7 @@ from keras.layers import Conv1D, Bidirectional, BatchNormalization,Conv2D, MaxPo
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import concatenate
 from sklearn.model_selection import train_test_split
+from tensorflow.keras.callbacks import ModelCheckpoint
 
 from sklearn.preprocessing import MinMaxScaler
 
@@ -22,6 +37,9 @@ from tqdm import tqdm
 from utils import set_gpu
 import utils
 import ast
+
+import matplotlib.pyplot as plt
+
 
 
 import argparse
@@ -52,12 +70,6 @@ def load_data(path="results/synthetic.csv", images_path="data/real_segmentations
     MONOLAYER = [0, 3, 6, 9, 12, 24, 27]
     SPHERES = [0, 3, 6, 9, 12, 15]
     max_time_steps = max(len(MONOLAYER), len(SPHERES))  # Calculate max time steps
-
-
-    # Calculate real times based on CellType
-    # df.loc[df['CellType'] == 0, 'Time'] = df.loc[df['CellType'] == 0, 'Time'].map(lambda x: MONOLAYER[x])
-    # df.loc[df['CellType'] == 1, 'Time'] = df.loc[df['CellType'] == 1, 'Time'].map(lambda x: SPHERES[x])
-
 
     X = []
     y = []
@@ -150,19 +162,6 @@ ID Sphere_1
                 print("time to close", relative_change)
                 id_data.loc[id_data['Time'] == utils.SPHERES[t], 'Time_To_Close'] = relative_change
             id_data.loc[id_data['Time'] == utils.SPHERES[-1], 'Time_To_Close'] = 0
-            
-
-        # perimeter_0 = id_data.loc[id_data['Time'] == 0, 'Perimeter'].values[0] 
-        # perimeter = id_data['Perimeter'].map(lambda x: x if x>0 else 0) 
-        # print("perimeter", perimeter)
-  
-        # id_data['Relative_Wound_Perimeter'] = perimeter / perimeter_0 
-        # id_data['Percentage_Wound_Closure_Perimeter'] = np.where(id_data['Time'] != 0, ((perimeter_0 - perimeter) / perimeter_0) * 100, np.nan)
-        # id_data['Healing_Speed_Perimeter'] = np.where(id_data['Time'] != 0, (perimeter_0 - perimeter) / id_data['Time'], np.nan)
-        
-        # id_data['Relative_Wound_Perimeter'].fillna(0, inplace=True)
-        # id_data['Percentage_Wound_Closure_Perimeter'].fillna(0, inplace=True)
-        # id_data['Healing_Speed_Perimeter'].fillna(0, inplace=True)
         #------------------------------------
 
 
@@ -200,9 +199,7 @@ ID Sphere_1
         #------------------------------------
         # Build the X array with cell type, time and area
         # and the y array with  the relative wound are, percentage of closure and healing speed
-        # X.append(id_data[['CellType', 'Time', 'Area']].values)
-        # y.append(id_data[['Relative_Wound_Area', 'Percentage_Wound_Closure', 'Healing_Speed']].values)
-
+    
         input_features = ['CellType', 'Time', 'Area', 'Perimeter', 'Edge_Pixels', 'H_HSV', 'S_HSV', 'V_HSV', 'Energy', 'Entropy']
         output_features = ['Time_To_Close', 'Relative_Wound_Area', 'Percentage_Wound_Closure', 'Healing_Speed']
         X.append(id_data[input_features].values)
@@ -210,8 +207,6 @@ ID Sphere_1
 
         print("input_features", id_data[input_features])
         print("output_features", id_data[output_features])
-        
-        # y.append(id_data[['Relative_Wound_Area', 'Percentage_Wound_Closure', 'Healing_Speed', 'Relative_Wound_Perimeter', 'Percentage_Wound_Closure_Perimeter', 'Healing_Speed_Perimeter']].values)
 
         #------------------------------------
     
@@ -288,7 +283,20 @@ def create_model(image_shape, ninputs=3, noutputs=3, architecture=0, hidden_unit
 METRICS = ['MeanSquaredError', 'MeanAbsoluteError', 'RootMeanSquaredError']  # The names of the metrics (this order is important)
 
 def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_train, images_test, original_shape_y_test, scaler_y, timesteps_test, epochs):
-    history = model.fit([X_train, images_train], y_train, validation_data=([X_test, images_test], y_test), epochs=epochs, batch_size=16, verbose=1)#, validation_data=(X_test, y_test))
+    # Define the checkpoint path and filename
+    checkpoint_path = f"results/train/best_model.h5"
+
+    # Define the ModelCheckpoint callback
+    checkpoint = ModelCheckpoint(
+        checkpoint_path,
+        monitor="val_loss", #"val_loss",
+        save_best_only=True,
+        mode="min", #"min",
+        verbose=1
+    )
+
+    history = model.fit([X_train, images_train], y_train, validation_data=([X_test, images_test], y_test), 
+                        epochs=epochs, batch_size=16, callbacks=[checkpoint], verbose=1)#, validation_data=(X_test, y_test))
     score = model.evaluate([X_test, images_test], y_test, verbose=1)
 
     # Extract metric names and indices from the model's metrics_names
@@ -332,6 +340,115 @@ def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_tra
 
     results.to_csv('results/train/predictions_vs_true.csv', index=False)
 
+
+    history_dict = history.history
+    plt.style.use("ggplot")
+    plt.figure(figsize=(10, 8))  # Change to whatever size fits best
+    N = len(history_dict["loss"])
+    plt.plot(np.arange(0, N), history_dict["loss"], label="training_loss")
+    plt.plot(np.arange(0, N), history_dict["val_loss"], label="val_loss")
+    # plt.plot(np.arange(0, N), history_dict["accuracy"], label="training_acc")
+    # plt.plot(np.arange(0, N), history_dict["val_accuracy"], label="val_acc")
+    plt.title("Performance Metrics of Valence Emotion State")
+    plt.xlabel("Epoch #")
+    plt.ylabel("Loss/Accuracy")
+    plt.legend(loc="best", bbox_to_anchor=(0.5, 0., 0.5, 0.5))
+    plt.tight_layout()
+    plt.savefig(f"results/train/history_loss_plot.png", dpi=300)
+
+    plt.style.use("ggplot")
+    plt.figure(figsize=(10, 8))  # Change to whatever size fits best
+    N = len(history_dict["loss"])
+    plt.plot(np.arange(0, N), history_dict["MeanSquaredError_output_1"], label="training_MSE_1")
+    plt.plot(np.arange(0, N), history_dict["val_MeanSquaredError_output_1"], label="val_MSE_1")
+    plt.plot(np.arange(0, N), history_dict["MeanSquaredError_output_2"], label="training_MSE_2")
+    plt.plot(np.arange(0, N), history_dict["val_MeanSquaredError_output_2"], label="val_MSE_2")
+    plt.plot(np.arange(0, N), history_dict["MeanSquaredError_output_3"], label="training_MSE_3")
+    plt.plot(np.arange(0, N), history_dict["val_MeanSquaredError_output_3"], label="val_MSE_3")
+    plt.plot(np.arange(0, N), history_dict["MeanSquaredError_output_4"], label="training_MSE_4")
+    plt.plot(np.arange(0, N), history_dict["val_MeanSquaredError_output_4"], label="val_MSE_4")
+    # plt.plot(np.arange(0, N), history_dict["accuracy"], label="training_acc")
+    # plt.plot(np.arange(0, N), history_dict["val_accuracy"], label="val_acc")
+    plt.title("Performance Metrics")
+    plt.xlabel("Epoch #")
+    plt.ylabel("Loss/Accuracy")
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    plt.tight_layout()
+    plt.savefig(f"results/train/history_MSE_loss_plot.png", dpi=300)
+
+    plt.style.use("ggplot")
+    plt.figure(figsize=(10, 8))  # Change to whatever size fits best
+    N = len(history_dict["loss"])
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_1"], label="training_MAE_1")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_1"], label="val_MAE_1")
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_2"], label="training_MAE_2")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_2"], label="val_MAE_2")
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_3"], label="training_MAE_3")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_3"], label="val_MAE_3")
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_4"], label="training_MAE_4")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_4"], label="val_MAE_4")
+    # plt.plot(np.arange(0, N), history_dict["accuracy"], label="training_acc")
+    # plt.plot(np.arange(0, N), history_dict["val_accuracy"], label="val_acc")
+    plt.title("Performance Metrics")
+    plt.xlabel("Epoch #")
+    plt.ylabel("Loss/Accuracy")
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    plt.tight_layout()
+    plt.savefig(f"results/train/history_MAE_loss_plot.png", dpi=300)
+
+    plt.style.use("ggplot")
+    plt.figure(figsize=(10, 8))  # Change to whatever size fits best
+    N = len(history_dict["loss"])
+    plt.plot(np.arange(0, N), history_dict["RootMeanSquaredError_output_1"], label="training_RMSE_1")
+    plt.plot(np.arange(0, N), history_dict["val_RootMeanSquaredError_output_1"], label="val_RMSE_1")
+    plt.plot(np.arange(0, N), history_dict["RootMeanSquaredError_output_2"], label="training_RMSE_2")
+    plt.plot(np.arange(0, N), history_dict["val_RootMeanSquaredError_output_2"], label="val_RMSE_2")
+    plt.plot(np.arange(0, N), history_dict["RootMeanSquaredError_output_3"], label="training_RMSE_3")
+    plt.plot(np.arange(0, N), history_dict["val_RootMeanSquaredError_output_3"], label="val_RMSE_3")
+    plt.plot(np.arange(0, N), history_dict["RootMeanSquaredError_output_4"], label="training_RMSE_4")
+    plt.plot(np.arange(0, N), history_dict["val_RootMeanSquaredError_output_4"], label="val_RMSE_4")
+    # plt.plot(np.arange(0, N), history_dict["accuracy"], label="training_acc")
+    # plt.plot(np.arange(0, N), history_dict["val_accuracy"], label="val_acc")
+    plt.title("Performance Metrics of Valence Emotion State")
+    plt.xlabel("Epoch #")
+    plt.ylabel("Loss/Accuracy")
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    plt.tight_layout()
+    plt.savefig(f"results/train/history_RMSE_loss_plot.png", dpi=300)
+
+    plt.style.use("ggplot")
+    plt.figure(figsize=(10, 8))  # Change to whatever size fits best
+    N = len(history_dict["loss"])
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_1"], label="training_MAE_1")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_1"], label="val_MAE_1")
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_2"], label="training_MAE_2")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_2"], label="val_MAE_2")
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_3"], label="training_MAE_3")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_3"], label="val_MAE_3")
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_4"], label="training_MAE_4")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_4"], label="val_MAE_4")
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_1"], label="training_MAE_1")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_1"], label="val_MAE_1")
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_2"], label="training_MAE_2")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_2"], label="val_MAE_2")
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_3"], label="training_MAE_3")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_3"], label="val_MAE_3")
+    plt.plot(np.arange(0, N), history_dict["MeanAbsoluteError_output_4"], label="training_MAE_4")
+    plt.plot(np.arange(0, N), history_dict["val_MeanAbsoluteError_output_4"], label="val_MAE_4")
+    plt.plot(np.arange(0, N), history_dict["RootMeanSquaredError_output_1"], label="training_RMSE_1")
+    plt.plot(np.arange(0, N), history_dict["val_RootMeanSquaredError_output_1"], label="val_RMSE_1")
+    plt.plot(np.arange(0, N), history_dict["RootMeanSquaredError_output_2"], label="training_RMSE_2")
+    plt.plot(np.arange(0, N), history_dict["val_RootMeanSquaredError_output_2"], label="val_RMSE_2")
+    plt.plot(np.arange(0, N), history_dict["RootMeanSquaredError_output_3"], label="training_RMSE_3")
+    plt.plot(np.arange(0, N), history_dict["val_RootMeanSquaredError_output_3"], label="val_RMSE_3")
+    plt.plot(np.arange(0, N), history_dict["RootMeanSquaredError_output_4"], label="training_RMSE_4")
+    plt.plot(np.arange(0, N), history_dict["val_RootMeanSquaredError_output_4"], label="val_RMSE_4")
+    plt.title("Performance Metrics")
+    plt.xlabel("Epoch #")
+    plt.ylabel("Loss/Accuracy")
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    plt.tight_layout()
+    plt.savefig(f"results/train/history_all_loss_plot.png", dpi=300)
 
 
     return avg_metrics

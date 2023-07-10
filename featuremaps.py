@@ -1,5 +1,19 @@
 #!venv/bin/python3
 
+"""
+Contains functions for loading the wound dataset.
+
+(c) All rights reserved.
+original authors: Francisco M. Garcia-Moreno. 2023.
+
+Source code:
+https://github.com/frangam/wound-healing
+
+Please see LICENSE.md for the full license document:
+https://github.com/frangam/wound-healing/LICENSE.md
+"""
+
+
 import os
 import argparse
 import matplotlib.pyplot as plt
