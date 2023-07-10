@@ -59,15 +59,7 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, n
     new_predictions = []
 
     for i in tqdm(range(num_frames_to_show), "Predicting..."):
-        # print("frames shape", np.array(frames).shape)
-        # # Check if there are enough frames in the example
-        # if num_frames_initial + i + 1 <= len(example):
-        # if include_original:
-        #     frames = example[: num_frames_initial + i + 1, ...]
-        # else:
-        #     # If not, create a black image and add it to frames
-        #     black_image = np.zeros((1, h, w, 3))  # Added extra dimension
-        #     frames = np.concatenate((frames, black_image), axis=0)
+       
         print("frames to predict", frames.shape)
         new_prediction = model.predict(np.expand_dims(frames, axis=0))
         print("new_prediction", new_prediction.shape)
@@ -85,43 +77,9 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, n
         else:
             frames = example[: num_frames_initial + i + 1, ...]
 
-        # if len(sq_predicted_frame.shape) == 3:
-        #     sq_predicted_frame = cv2.cvtColor(sq_predicted_frame, cv2.COLOR_BGR2GRAY)
-        # else:
-        #     mask_gray = cv2.normalize(src=predicted_frame, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-        #     img_uint8 = mask_gray.astype(np.uint8)
-        #     imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_GRAY2RGB)
-        #     predicted_frame = cv2.cvtColor(imgRGB, cv2.COLOR_RGB2GRAY)
-        # predicted_frame = predicted_frame.astype(np.uint8)
-
-        # if thr_whit>=0:
-        #     sq_predicted_frame[sq_predicted_frame > thr_whit] = 255
-        # # sq_predicted_frame /= 255.0
-
         new_predictions.append(sq_predicted_frame)
         
-        # orig_path = f"{save_path}{inc}/original/"
-        # os.makedirs(orig_path, exist_ok=True)
-        # image_filename = os.path.join(orig_path, f"original_frame_{example_index}_{i}.png")
-        # if i < len(original_frames):
-        #     image = original_frames[i]
-        #     if len(image.shape) == 3 and image.shape[2] == 1:
-        #         image = np.squeeze(image, axis=2) # Eliminar la dimensión del canal
-        #     print("original shape", image.shape)
-        #     plt.imsave(image_filename, image, cmap="gray")
-        # else:
-        #     black_image = Image.new('L', (w, h))
-        #     black_image.save(image_filename)
-        
-        # pred_path = f"{save_path}{inc}/prediction/"
-        # os.makedirs(pred_path, exist_ok=True)
-        # image_filename = os.path.join(pred_path, f"prediction_frame_{example_index}_{i}.png")
-        # if len(sq_predicted_frame.shape) == 3 and sq_predicted_frame.shape[2] == 1:
-        #     # Eliminar la dimensión del canal
-        #     sq_predicted_frame = np.squeeze(sq_predicted_frame, axis=2)
-        # print("predict shape", sq_predicted_frame.shape)
-        # plt.imsave(image_filename, sq_predicted_frame, cmap="gray")
-    
+       
     
     inc = "incremental" if include_original else "sequential"
     orig_path = f"{save_path}{inc}/original/"
