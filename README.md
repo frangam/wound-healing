@@ -88,7 +88,9 @@ We use a combination of [Meta's Segment Anything model](https://github.com/faceb
 
 ## Citing PWPF
 
-If you use PWPF in your research, please use the following BibTeX entry.
+The Predicting Wound Progress Framework (PWPF) is a registered intellectual property in Andalusia, Spain (reference: XXX). Despite its proprietary status, it can be freely used for research purposes, given that proper citation is provided.
+
+If you use PWPF in your research, please use the following BibTeX entry:
 
 ```
 @misc{Garcia-Moreno-PWPF,
@@ -101,7 +103,7 @@ If you use PWPF in your research, please use the following BibTeX entry.
 }
 ```
 
-If you use our MCF-7 Dataset:
+And also cite our MCF-7 Dataset used to train our software:
 
 ```
 @misc{Ruiz-EspigaresMCF7,
