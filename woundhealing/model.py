@@ -16,7 +16,7 @@ import tensorflow as tf
 
 from tensorflow import keras
 
-from tensorflow.keras.layers import ConvLSTM2D, GRU, BatchNormalization, Conv3D, Input, Reshape, UpSampling2D, Concatenate, MaxPooling2D, Conv2D, TimeDistributed, Lambda, MaxPooling3D, Add, LSTM, Conv2DTranspose, Flatten, Dense
+from tensorflow.keras.layers import ConvLSTM2D, GRU, BatchNormalization, Conv3D, Input, Reshape, UpSampling2D, Concatenate, MaxPooling2D, Conv2D, TimeDistributed, Lambda, MaxPooling3D, Add, LSTM, Conv2DTranspose, Flatten, Dense, RepeatVector
 from tensorflow.keras.models import Model
 from tensorflow.keras import layers
 from keras.activations import softmax
@@ -52,50 +52,85 @@ def create_model(input_shape, architecture, num_layers=3):
     model (keras.Model): The compiled Convolutional LSTM or GRU model.
     """
 
-    if architecture == 0:
+    if architecture == 0: #ConvLSTM-1
         model = architecture_conv_lstm(input_shape[2:], num_layers=1) # architecture_conv_lstm(input_shape[2:], num_layers)
-    elif architecture == 1:
-        model = model = architecture_conv_lstm(input_shape[2:], num_layers=3)
-    elif architecture == 2:
-        model = model = architecture_conv_lstm(input_shape[2:], num_layers=6)
-    elif architecture == 3:
-        model = arch_1(input_shape[2:]) 
-    elif architecture == 4:
+    elif architecture == 1: #ConvLSTM-3
+        model = architecture_conv_lstm(input_shape[2:], num_layers=3)
+    elif architecture == 2: #ConvLSTM-6
+        model = architecture_conv_lstm(input_shape[2:], num_layers=6)
+    elif architecture == 3: #ConvLSTM-2
+        model = architecture_conv_lstm(input_shape[2:], num_layers=2) 
+    elif architecture == 4: #CasConvLSTM
         model = arch_2(input_shape[2:]) 
-        # model = architecture_gru(input_shape, num_layers)
-        # model = architecture_conv3d_conv2d(input_shape[2:], num_layers)
-    elif architecture == 5:
+    elif architecture == 5: #ConvLSTM2D-Conv2D-3D
         model = arch_3(input_shape[2:]) 
-    elif architecture == 6:
-        model = arch_4(input_shape[2:]) 
-    elif architecture == 7:
+    elif architecture == 6: #MultiPathConvLSTM
         model = arch_5(input_shape[2:]) 
-    elif architecture == 8:
+    elif architecture == 7: #ResConvLSTM-2x64
+        model = residual_conv_lstm(input_shape[2:], num_layers=2, num_filters=64, dropout_rate_list=[0.3,0.3])
+    elif architecture == 8: #ResConvLSTM-3x64
         model = residual_conv_lstm(input_shape[2:], num_layers=3, num_filters=64, dropout_rate_list=[0.3,0.3,0.3])
-    elif architecture == 9: #BEST #91.32 SSIM
+    elif architecture == 9: #ResConvLSTM-6x64
         model = residual_conv_lstm(input_shape[2:], num_layers=6, num_filters=64, dropout_rate_list=[0.3,0.3,0.3,0.3,0.3,0.3])
-    elif architecture == 10:
+    elif architecture == 10: #ResConvLSTM-9x64
         model = residual_conv_lstm(input_shape[2:], num_layers=9, num_filters=64, dropout_rate_list=[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3])
-    elif architecture == 11:
+    elif architecture == 11: #ResConvLSTM-3x32
         model = residual_conv_lstm(input_shape[2:], num_layers=3, num_filters=32, dropout_rate_list=[0.1,0.1,0.3])
-    elif architecture == 12: #90.4% SSIM
+    elif architecture == 12: #ResConvLSTM-3x128
         model = residual_conv_lstm(input_shape[2:], num_layers=3, num_filters=128, dropout_rate_list=[0.1,0.1,0.1])
-    elif architecture == 13: #90.02% SSIM
+    elif architecture == 13: #ResConvLSTM-4x64
+        model = residual_conv_lstm(input_shape[2:], num_layers=4, num_filters=64, dropout_rate_list=[0.3,0.3,0.3,0.3])
+    elif architecture == 14: #ResConvLSTM-4x128
         model = residual_conv_lstm(input_shape[2:], num_layers=4, num_filters=128, dropout_rate_list=[0.3,0.3,0.3,0.3])
-    elif architecture == 14: #81.68% SSIM
-        model = residual_conv_lstm_par(input_shape[2:], num_layers=4, num_filters_list=[64,64,64,64], dropout_rate=0.3)
-    elif architecture == 15:
+        # model = residual_conv_lstm_par(input_shape[2:], num_layers=4, num_filters_list=[64,64,64,64], dropout_rate=0.3)
+    elif architecture == 15: #ResConvLSTM-3x256
         model = residual_conv_lstm(input_shape[2:], num_layers=3, num_filters=256, dropout_rate_list=[0.3,0.3,0.3])
-    elif architecture == 16: #0.8627 SSIM
-        model = architecture_fcn_2p_lstm(input_shape[2:])
-    elif architecture == 17: #0.8806 SSIM
+    elif architecture == 16: #ConvLSTMEncDec-3x64
+        model = architecture_fcn_2p_lstm(input_shape[2:], c=64)
+    elif architecture == 17: #ConvLSTM-2T
         model = arch_6(input_shape[2:])
-    elif architecture == 18:
+    elif architecture == 18: #TD-Dense-LSTM
         model = arch_7(input_shape[2:])
-    elif architecture == 19:
+    elif architecture == 19: #Transformer
         model = arch_transformer(input_shape[2:])
-    elif architecture == 20:
+    elif architecture == 20: #Transformer-4
         model = arch_transformer_2(input_shape[2:])
+    elif architecture == 21: #ConvLSTM-8
+        model = architecture_conv_lstm(input_shape[2:], num_layers=8)
+    elif architecture == 22: #ConvLSTM-10
+        model = architecture_conv_lstm(input_shape[2:], num_layers=10)
+    elif architecture == 23: #ConvLSTM-12
+        model = architecture_conv_lstm(input_shape[2:], num_layers=12)
+    elif architecture == 24: #ResConvLSTM-4x256
+        model = residual_conv_lstm(input_shape[2:], num_layers=4, num_filters=256, dropout_rate_list=[0.3,0.3,0.3,0.3])
+    elif architecture == 25: #ResConvLSTM-4x512
+        model = residual_conv_lstm(input_shape[2:], num_layers=4, num_filters=512, dropout_rate_list=[0.3,0.3,0.3,0.3])
+    elif architecture == 30: # Conv2D-1x32
+        model = arch_Conv2D(input_shape[2:], n_layers=1, filters=32)
+    elif architecture == 31: # Conv2D-2x32
+        model = arch_Conv2D(input_shape[2:], n_layers=1, filters=32)
+    elif architecture == 32: #LSTM-1x32
+        model = arch_LSTM(input_shape[2:], 1, 32)
+    elif architecture == 33: #LSTM-2x32
+        model = arch_LSTM(input_shape[2:], 2, 32)
+    elif architecture == 34: #LSTM-4x32
+        model = arch_LSTM(input_shape[2:], 4, 32)
+    elif architecture == 40: #ConvLSTMEncDec-3x32
+        model = architecture_fcn_2p_lstm(input_shape[2:], c=32)
+    elif architecture == 41: #ConvLSTMEncDec-3x128
+        model = architecture_fcn_2p_lstm(input_shape[2:], c=128)
+    elif architecture == 42: #ConvLSTMEncDec-3x256
+        model = architecture_fcn_2p_lstm(input_shape[2:], c=256)
+    elif architecture == 43: # ConvLSTMEncDec-2x64
+        model = configurable_architecture(input_shape[2:], c=64, num_convlstm_layers=3)
+    elif architecture == 44: # ConvLSTMEncDec-2x128
+        model = configurable_architecture(input_shape[2:], c=128, num_convlstm_layers=3)
+    elif architecture == 45: # ConvLSTMEncDec-2x256
+        model = configurable_architecture(input_shape[2:], c=256, num_convlstm_layers=3)
+    elif architecture == 50: #
+        model = res_convlstm_enc_dec(input_shape[2:], c=64, num_convlstm_layers=3)
+    elif architecture == 60:
+        model = architecture_fcn_2p_lstm_4(input_shape[2:], c=64)
     else:
         raise ValueError("Invalid architecture index.")
 
@@ -108,31 +143,133 @@ def create_model(input_shape, architecture, num_layers=3):
 
     return model
 
-
-
-def architecture_fcn_2p_lstm(input_shape, c=64):
+def configurable_architecture(input_shape, c=64, num_convlstm_layers=3):
     input_image = Input(shape=(None, *input_shape), name="input")
-    x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(input_image)
-    x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    
+    # Encoder
+    x = input_image
+    for i in range(num_convlstm_layers):
+        x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
     c1 = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
 
     x = TimeDistributed(MaxPooling2D((2, 2), strides=(2, 2)))(c1)
     x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
-    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
     c2 = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
 
+    # Decoder
+    x = TimeDistributed(UpSampling2D((2, 2)))(c2)
+    x = Concatenate()([c1, x])
+    x = TimeDistributed(Conv2D(c, (3, 3), padding="same", activation="relu"))(x)
+    x = TimeDistributed(Conv2D(3, (3, 3), padding="same", activation="relu"))(x)
+
+    output = TimeDistributed(Conv2D(input_shape[-1], (3, 3), padding="same", activation="sigmoid", name="output"))(x)
+    output = Lambda(scale_weights, arguments={'scale': 1.0})(output)
+
+    model = Model(inputs=input_image, outputs=[output])
+    
+    return model
+
+
+
+def architecture_fcn_2p_lstm(input_shape, c=64):
+    input_image = Input(shape=(None, *input_shape), name="input")
+
+    # ------- Encoder starts here -------
+    # First ConvLSTM layer
+
+    x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(input_image)
+    x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c1 = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    
+    # Second ConvLSTM layer
+    x = TimeDistributed(MaxPooling2D((2, 2), strides=(2, 2)))(c1)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c2 = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    
+    # Third ConvLSTM layer
+    x = TimeDistributed(MaxPooling2D((2, 2), strides=(2, 2)))(c2)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c3 = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    # ------- Encoder ends here -------
+
+    # ------- Decoder starts here -------
+    # First Upsampling layer
+    x = TimeDistributed(UpSampling2D((2, 2)))(c3)
+    x = Concatenate()([c2, x])
+    x = TimeDistributed(Conv2D(c, (3, 3), padding="same", activation="relu"))(x)
+
+    # Second Upsampling layer
+    x = TimeDistributed(UpSampling2D((2, 2)))(x)
+    x = Concatenate()([c1, x])
+    x = TimeDistributed(Conv2D(3, (3, 3), padding="same", activation="relu"))(x)
+    # ------- Decoder ends here -------
+
+    output = TimeDistributed(Conv2D(input_shape[-1], (3, 3), padding="same", activation="sigmoid", name="output"))(x)
+    output = Lambda(scale_weights, arguments={'scale': 1.0})(output)
+
+    model = Model(inputs=input_image, outputs=[output])
+    
+    return model
+
+def architecture_fcn_2p_lstm_4(input_shape, c=64):
+    input_image = Input(shape=(None, *input_shape), name="input")
+
+    # ------- Encoder starts here -------
+    # First ConvLSTM layer
+
+    x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(input_image)
+    x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c1 = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    
+    # Second ConvLSTM layer
+    x = TimeDistributed(MaxPooling2D((2, 2), strides=(2, 2)))(c1)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c2 = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    
+    # Third ConvLSTM layer
     x = TimeDistributed(MaxPooling2D((2, 2), strides=(2, 2)))(c2)
     x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
     x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
     c3 = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
 
-    x = TimeDistributed(UpSampling2D((2, 2)))(c3)
-    x = Concatenate()([c2, x])
+    # Fourth ConvLSTM layer
+    x = TimeDistributed(MaxPooling2D((2, 2), strides=(2, 2)))(c3)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c4 = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+
+
+    # Fifth ConvLSTM layer
+    x = TimeDistributed(MaxPooling2D((2, 2), strides=(2, 2)))(c4)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    x = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c5 = ConvLSTM2D(filters=2*c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    # ------- Encoder ends here -------
+
+    # ------- Decoder starts here -------
+    # First Upsampling layer
+    x = TimeDistributed(UpSampling2D((2, 2)))(c5)
+    x = Concatenate()([c4, x])
     x = TimeDistributed(Conv2D(c, (3, 3), padding="same", activation="relu"))(x)
 
+    # Second Upsampling layer
+    x = TimeDistributed(UpSampling2D((2, 2)))(x)
+    x = Concatenate()([c3, x])
+    x = TimeDistributed(Conv2D(3, (3, 3), padding="same", activation="relu"))(x)
+
+    # Third Upsampling layer
+    x = TimeDistributed(UpSampling2D((2, 2)))(x)
+    x = Concatenate()([c2, x])
+    x = TimeDistributed(Conv2D(3, (3, 3), padding="same", activation="relu"))(x)
+
+     # Fourth Upsampling layer
     x = TimeDistributed(UpSampling2D((2, 2)))(x)
     x = Concatenate()([c1, x])
     x = TimeDistributed(Conv2D(3, (3, 3), padding="same", activation="relu"))(x)
+    # ------- Decoder ends here -------
 
     output = TimeDistributed(Conv2D(input_shape[-1], (3, 3), padding="same", activation="sigmoid", name="output"))(x)
     output = Lambda(scale_weights, arguments={'scale': 1.0})(output)
@@ -187,18 +324,18 @@ def arch_3(input_shape):
     model = Model(inputs=input_layer, outputs=x)
     return model
 
-def arch_4(input_shape):
-    '''Arquitectura con residuos (Residual Network)'''
-    input_layer = Input(shape=(None, *input_shape))
-    x = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(input_layer)
-    x = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(x)
-    res = Add()([input_layer, x])
-    x = Conv3D(filters=input_shape[-1], kernel_size=(3, 3, 3), activation='sigmoid', padding='same')(res)
-    x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+# def arch_4(input_shape):
+#     '''Arquitectura con residuos (Residual Network)'''
+#     input_layer = Input(shape=(None, *input_shape))
+#     x = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(input_layer)
+#     x = ConvLSTM2D(filters=64, kernel_size=(3, 3), padding='same', return_sequences=True)(x)
+#     res = Add()([input_layer, x])
+#     x = Conv3D(filters=input_shape[-1], kernel_size=(3, 3, 3), activation='sigmoid', padding='same')(res)
+#     x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
 
-    model = Model(inputs=input_layer, outputs=x)
+#     model = Model(inputs=input_layer, outputs=x)
 
-    return model
+#     return model
 
 
 def arch_5(input_shape):
@@ -246,6 +383,32 @@ def arch_7(input_shape):
     x = Lambda(scale_weights, arguments={'scale': 1.0})(x)
 
     model = Model(inputs=input_layer, outputs=x)
+    return model
+
+def arch_Conv2D(input_shape, n_layers=2, filters=32):
+    input_layer = Input(shape=(None, *input_shape))
+    x = input_layer
+    for _ in range(n_layers):
+        x = TimeDistributed(Conv2D(32, (3, 3), activation='relu', padding='same'))(x)
+    x = TimeDistributed(Flatten())(x)
+    x = TimeDistributed(Dense(input_shape[0]*input_shape[1]*input_shape[2], activation='sigmoid'))(x)
+    output_layer = TimeDistributed(Reshape((input_shape[0], input_shape[1], input_shape[2])))(x)
+
+    model = Model(inputs=input_layer, outputs=output_layer)
+    return model
+
+def arch_LSTM(input_shape, n_layers=2, filters=32):
+    input_layer = Input(shape=(None, *input_shape))
+    x = TimeDistributed(Flatten())(input_layer)
+    for _ in range(n_layers-1):
+        x = LSTM(filters, return_sequences=True)(x)
+    x = LSTM(32, return_sequences=True)(x)
+    x = TimeDistributed(Dense(input_shape[0]*input_shape[1]*input_shape[2], activation='sigmoid'))(x)
+    x = TimeDistributed(Reshape((input_shape[0], input_shape[1], input_shape[2])))(x)
+    output_layer = Lambda(scale_weights, arguments={'scale': 1.0})(x)
+
+
+    model = Model(inputs=input_layer, outputs=output_layer)
     return model
 
 
@@ -388,56 +551,56 @@ def architecture_conv_lstm(input_shape, num_layers, scaling_factor=1.0):
     model = Model(inp, x)
     return model
 
-def conv_lstm_block(inputs, filters):
-    x = layers.ConvLSTM2D(filters=filters, kernel_size=(3, 3), padding='same', return_sequences=True)(inputs)
-    x = layers.BatchNormalization()(x)
-    x = layers.ConvLSTM2D(filters=filters, kernel_size=(3, 3), padding='same', return_sequences=True)(x)
-    x = layers.BatchNormalization()(x)
-    return x
+# def conv_lstm_block(inputs, filters):
+#     x = layers.ConvLSTM2D(filters=filters, kernel_size=(3, 3), padding='same', return_sequences=True)(inputs)
+#     x = layers.BatchNormalization()(x)
+#     x = layers.ConvLSTM2D(filters=filters, kernel_size=(3, 3), padding='same', return_sequences=True)(x)
+#     x = layers.BatchNormalization()(x)
+#     return x
 
-def unet_block(inputs, filters):
-    x = layers.Conv2D(filters=filters, kernel_size=(3, 3), activation='relu', padding='same')(inputs)
-    x = layers.BatchNormalization()(x)
-    x = layers.Conv2D(filters=filters, kernel_size=(3, 3), activation='relu', padding='same')(x)
-    x = layers.BatchNormalization()(x)
-    return x
+# def unet_block(inputs, filters):
+#     x = layers.Conv2D(filters=filters, kernel_size=(3, 3), activation='relu', padding='same')(inputs)
+#     x = layers.BatchNormalization()(x)
+#     x = layers.Conv2D(filters=filters, kernel_size=(3, 3), activation='relu', padding='same')(x)
+#     x = layers.BatchNormalization()(x)
+#     return x
 
-def architecture_bidirectional_conv_lstm_unet(input_shape, num_layers):
-    """
-    Bi-directional ConvLSTM U-Net Architecture: Multiple Bi-directional ConvLSTM2D layers followed by Conv2D layers.
+# def architecture_bidirectional_conv_lstm_unet(input_shape, num_layers):
+#     """
+#     Bi-directional ConvLSTM U-Net Architecture: Multiple Bi-directional ConvLSTM2D layers followed by Conv2D layers.
 
-    Parameters:
-    input_shape (tuple): The shape of the input data (num_frames, width, height, channels).
-    num_layers (int): The number of layers to include in the model.
+#     Parameters:
+#     input_shape (tuple): The shape of the input data (num_frames, width, height, channels).
+#     num_layers (int): The number of layers to include in the model.
 
-    Returns:
-    model (keras.Model): The Bi-directional ConvLSTM U-Net model.
-    """
-    inp = Input(shape=(None, *input_shape))
-    x = inp
+#     Returns:
+#     model (keras.Model): The Bi-directional ConvLSTM U-Net model.
+#     """
+#     inp = Input(shape=(None, *input_shape))
+#     x = inp
 
-    # Encoder
-    encoder_outputs = []
-    for _ in range(num_layers):
-        x = conv_lstm_block(x, filters=64)
-        encoder_outputs.append(x)
-        x = tf.nn.pool(x, window_shape=(1, 2, 2), pooling_type='MAX', padding='SAME', strides=(1, 2, 2))
+#     # Encoder
+#     encoder_outputs = []
+#     for _ in range(num_layers):
+#         x = conv_lstm_block(x, filters=64)
+#         encoder_outputs.append(x)
+#         x = tf.nn.pool(x, window_shape=(1, 2, 2), pooling_type='MAX', padding='SAME', strides=(1, 2, 2))
 
-    # Bi-directional ConvLSTM
-    x = conv_lstm_block(x, filters=128)
-    x = layers.Bidirectional(layers.ConvLSTM2D(128, kernel_size=(3, 3), padding='same', return_sequences=True))(x)
+#     # Bi-directional ConvLSTM
+#     x = conv_lstm_block(x, filters=128)
+#     x = layers.Bidirectional(layers.ConvLSTM2D(128, kernel_size=(3, 3), padding='same', return_sequences=True))(x)
 
-    # Decoder
-    for i in range(num_layers - 1, -1, -1):
-        x = layers.Concatenate()([x, encoder_outputs[i]])
-        x = conv_lstm_block(x, filters=64)
-        x = tf.keras.layers.UpSampling3D(size=(1, 2, 2))(x)
+#     # Decoder
+#     for i in range(num_layers - 1, -1, -1):
+#         x = layers.Concatenate()([x, encoder_outputs[i]])
+#         x = conv_lstm_block(x, filters=64)
+#         x = tf.keras.layers.UpSampling3D(size=(1, 2, 2))(x)
 
-    # Final Conv2D layer
-    x = layers.Conv2D(filters=input_shape[-1], kernel_size=(3, 3), activation='sigmoid', padding='same')(x)
+#     # Final Conv2D layer
+#     x = layers.Conv2D(filters=input_shape[-1], kernel_size=(3, 3), activation='sigmoid', padding='same')(x)
 
-    model = Model(inp, x)
-    return model
+#     model = Model(inp, x)
+#     return model
 
 # def architecture_gru(input_shape, num_layers):
 #     """
@@ -659,8 +822,8 @@ def arch_transformer_2(input_shape):
     x = layers.Reshape((-1, np.prod(x.shape[2:])))(x)
 
     # Transformer blocks
-    for _ in range(num_blocks):
-        transformer_block = TransformerBlock(num_heads, ff_dim, 0.1, embed_dim)
+    for i in range(num_blocks):
+        transformer_block = TransformerBlock(num_heads, ff_dim, 0.1, embed_dim, f"transformer_block_{i+1}")
         x = transformer_block(x)
 
     # Decoding layers to reconstruct the image
@@ -675,4 +838,31 @@ def arch_transformer_2(input_shape):
     return model
 
 
+
+
+def res_convlstm_enc_dec(input_shape, c=64, num_convlstm_layers=3):
+    input_image = Input(shape=(None, *input_shape), name="input")
+    
+    # Encoder
+    x = input_image
+    for i in range(num_convlstm_layers - 1):
+        x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c1 = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+
+    x = TimeDistributed(MaxPooling2D((2, 2), strides=(2, 2)))(c1)
+    x = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+    c2 = ConvLSTM2D(filters=c, kernel_size=(3, 3), padding="same", return_sequences=True, activation="relu")(x)
+
+    # Decoder
+    x = TimeDistributed(UpSampling2D((2, 2)))(c2)
+    x = Concatenate()([c1, x])
+    x = TimeDistributed(Conv2D(c, (3, 3), padding="same", activation="relu"))(x)
+    x = TimeDistributed(Conv2D(3, (3, 3), padding="same", activation="relu"))(x)
+
+    output = TimeDistributed(Conv2D(input_shape[-1], (3, 3), padding="same", activation="sigmoid", name="output"))(x)
+    output = Lambda(scale_weights, arguments={'scale': 1.0})(output)
+
+    model = Model(inputs=input_image, outputs=[output])
+    
+    return model
 

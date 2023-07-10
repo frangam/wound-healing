@@ -36,13 +36,14 @@ def main():
     IMG_WIDTH = args.w
     IMG_HEIGHT = args.h
     
-    MONOLAYER = [0, 3, 6, 9, 12, 24, 27]
-    SPHERES = [0, 3, 6, 9, 12, 15, 18]
+    MONOLAYER = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+    SPHERES = [0, 3, 6, 9, 12, 15]
+    REDUCE_HEIGHT = 5
 
     # Pick a random start point
     seed_width  = np.rint(np.random.uniform(0, IMG_WIDTH, 1))[0].astype(np.int32)
-    seed_left  = np.rint(np.random.normal(0.25 * IMG_WIDTH, 1, 1))[0].astype(np.int32)
-    seed_right = np.rint(np.random.normal(0.75 * IMG_WIDTH, 1, 1))[0].astype(np.int32)
+    seed_left  = np.rint(np.random.normal(0.35 * IMG_WIDTH, 1, 1))[0].astype(np.int32)
+    seed_right = np.rint(np.random.normal(0.65 * IMG_WIDTH, 1, 1))[0].astype(np.int32)
 
     print('Initial values:', seed_left, seed_right, seed_width)
 
@@ -59,7 +60,7 @@ def main():
     # Generar DataFrames para las heridas y asignar ID y tipo de célula en cada iteración
     for i in tqdm(range(len(monolayer_wound_lists)), "Generating..."):        
         monolayer_wounds = monolayer_wound_lists[i]
-        # print("image shape", np.array(monolayer_wounds).shape)
+        print("image shape", np.array(monolayer_wounds).shape)
         sphere_wounds = sphere_wound_lists[i]
         
         monolayer_df = W.synthetic.generate_wound_dataframe(MONOLAYER, seed_left, seed_right, seed_width, IMG_WIDTH, IMG_HEIGHT)

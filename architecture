@@ -1,0 +1,22 @@
+digraph {
+	input_1 [label="Input (Features)"]
+	input_2 [label="Input (Images)"]
+	lstm [label=LSTM]
+	conv2d [label=Conv2D]
+	batch_normalization [label="Batch Normalization"]
+	conv_lstm2d [label=ConvLSTM2D]
+	time_distributed [label="Time Distributed"]
+	time_distributed_1 [label="Time Distributed"]
+	concatenate [label=Concatenate]
+	time_distributed_2 [label="Time Distributed"]
+	input_1 -> lstm
+	input_2 -> conv2d
+	conv2d -> batch_normalization
+	lstm -> time_distributed
+	conv2d -> conv_lstm2d
+	batch_normalization -> time_distributed
+	conv_lstm2d -> time_distributed_1
+	time_distributed -> concatenate
+	time_distributed_1 -> concatenate
+	concatenate -> time_distributed_2
+}

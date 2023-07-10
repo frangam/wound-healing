@@ -27,7 +27,7 @@ from tqdm import tqdm
 
 
 from woundhealing.synthetic import draw_wound
-from woundhealing.segment import setup_sam, predict_masks, get_area_perimeter, show_mask, show_points, show_box, get_mask_image
+from woundhealing.segment import setup_sam, predict_masks, get_area_perimeter, show_mask, show_points, show_box, get_mask_image, get_area_perimeter_2, calculate_color_features, calculate_edge_features, calculate_texture_features
 from woundhealing.utils import set_gpu
 from woundhealing import utils
 
@@ -38,7 +38,7 @@ MedSAM: "sam_vit_b_01ec64.pth; model_type="vit_b"
 
 Example of run:
 
-./gen_segments.py --gpu-id 3 --sam_checkpoint sam/medsam_tune_mask_decoder.pth --model_type vit_b
+./gen_segments.py --gpu-id 3 
 '''
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
@@ -100,6 +100,14 @@ new_cell_types = []
 new_times = []
 new_areas = []
 new_perimeters = []
+new_mean_H, new_mean_S, new_mean_V = [], [], []
+new_hist = []
+new_edge_pixels = []
+new_homogeneity = []
+new_energy = []
+new_entropy = []
+new_contrast = []
+new_correlation = []
 
 # df = df.head(2) #TODO remove this line (only for tests)
 for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
@@ -153,13 +161,15 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                     break
                 
                 if len(masks) > 1:
-                    area, perimeter = get_area_perimeter(image_array, args.pixel_size)
+                    # area, perimeter = get_area_perimeter(image_array, args.pixel_size)
 
                     new_ids.append(cell_id)
                     new_cell_types.append(cell_type)
-                    new_times.append(t)
-                    new_areas.append(area)  # Asegúrate de que `areas` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
-                    new_perimeters.append(perimeter)  # Asegúrate de que `perimeters` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
+                    nt = utils.MONOLAYER[t] if cell_type == 0 else utils.SPHERES[t]
+                    # print(f"[Cell ID {cell_id}] cell type: {cell_type} [time - {nt}]")
+                    new_times.append(nt)
+                    # new_areas.append(area)  # Asegúrate de que `areas` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
+                    # new_perimeters.append(perimeter)  # Asegúrate de que `perimeters` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
 
                     
                     #save original image
@@ -191,6 +201,7 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                         ax.axis('off')
                         plt.savefig(os.path.join(path1_1, f"{cell_id}_type_{cell_type}_segmentation_mask_{k}_{t+1}.png"), bbox_inches='tight', pad_inches=0)
                         plt.close(fig)
+                        ax.axis('off')
                     
                     print("utils.len_cell_type_time_step(cell_type)", utils.len_cell_type_time_step(cell_type))
                     #select the best fit for the mask, depending on the time in our case 
@@ -203,6 +214,40 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                     else:
                         print(f"[Cell type: {cell_type}]", "t:", t+1, "selecting first mask", f"[Score: {scores[0]}]")
                         best_mask = masks[0] #first mask
+                    
+                    mask_image = get_mask_image(best_mask, plt.gca(), alpha=False)
+                    mask_gray = cv2.normalize(src=mask_image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+                    # plt.figure(figsize=(6,5))
+                    # plt.savefig(os.path.join(path1_1, f"{cell_id}_type_{cell_type}_segmentation_mask_{k}_{t+1}.png"), bbox_inches='tight', pad_inches=0)
+
+                    area, perimeter, area_opencv = get_area_perimeter_2(best_mask, mask_gray, args.pixel_size, f"cell_{cell_id}_{cell_type}_t_{t}")
+                    if perimeter < 0:
+                        perimeter = 0
+                    new_areas.append(area)  # Asegúrate de que `areas` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
+                    new_perimeters.append(perimeter)  # Asegúrate de que `perimeters` sea un solo valor o una lista de valores del mismo tamaño que la cantidad de elementos en `wound_matrix`
+                    print(f"[Cell ID {cell_id}] cell type: {cell_type} [time - {nt}] >> Area = {area} | Perimeter = {perimeter}")
+                    
+
+                    # Calcular características de color
+                    mH, mS, mV, sH, sS, sV = calculate_color_features(mask_gray)
+                    new_mean_H.append(mH)
+                    new_mean_S.append(mS)
+                    new_mean_V.append(mV)
+
+
+                    # Calcular características de borde
+                    edge_pixels = calculate_edge_features(mask_gray) if perimeter > 0 else 0
+                    new_edge_pixels.append(edge_pixels)
+
+                    # Calcular características de textura
+                    contrast, correlation, energy, homogeneity, entropy = calculate_texture_features(mask_gray) if area > 0 else 0,0,0,0,0
+                    new_homogeneity.append(homogeneity)
+                    new_energy.append(energy)
+                    new_entropy.append(entropy)
+                    new_contrast.append(contrast)
+                    new_correlation.append(correlation)
+
+
 
                     #segmentations showing points
                     path2 = f"{seg_path}/points/"
@@ -255,11 +300,20 @@ new_df = pd.DataFrame({
     'CellType': new_cell_types,
     'Time': new_times,
     'Area': new_areas,
-    'Perimeter': new_perimeters
+    'Perimeter': new_perimeters,
+    'H_HSV': new_mean_H,
+    'S_HSV': new_mean_S,
+    'V_HSV': new_mean_V,
+    'Edge_Pixels': new_edge_pixels,
+    'Correlation': new_correlation,
+    'Contrast': new_contrast,
+    'Homogeneity': new_homogeneity,
+    'Energy': new_energy,
+    'Entropy': new_entropy,
 })
 
 os.makedirs("results/", exist_ok=True)
-dir = f'results/synthetic_segments.csv' if USE_SYNTHETIC else f'results/real_synthetic_segments.csv'
+dir = f'results/synthetic_segments.csv' if USE_SYNTHETIC else f'results/real_segments.csv'
 new_df.to_csv(dir, index=False)
 # print(new_df)
 

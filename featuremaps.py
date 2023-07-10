@@ -127,8 +127,8 @@ def run_deep_dream_simple(deepdream, img, steps=100, step_size=0.01):
 
 '''
 Examples of run:
-./featuremaps.py --type synth_monolayer --prefix synthetic --m 9
-./featuremaps.py --type real_monolayer --prefix real --m 9
+./featuremaps.py --type synth_monolayer --prefix synthetic --m 3
+./featuremaps.py --type real_monolayer --prefix real --m 3
 '''
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
@@ -137,7 +137,7 @@ p.add_argument('--type', type=str, default="synth_monolayer", help='the cell typ
 p.add_argument('--m', type=int, default=0, help="The model architecture. 0: ConvLSTM, 1: Bi-directional ConvLSTM and U-Net")
 p.add_argument('--w', type=int, default=64, help='the width')
 p.add_argument('--h', type=int, default=64, help='the height')
-p.add_argument('--ts', type=float, default=.8, help='the train split percentage')
+p.add_argument('--ts', type=float, default=.2, help='the train split percentage')
 args = p.parse_args()
 W.utils.set_gpu(args.gpu_id)
 
@@ -149,7 +149,7 @@ dataset = W.dataset.load_images(base_dir="data/", image_type=args.type, remove_f
 print(dataset.shape)
 
 # Split the dataset
-_, val_dataset = W.dataset.split_dataset(dataset, args.ts)
+_, val_dataset = W.dataset.split_dataset(dataset, None, args.ts)
 # Normalize the data
 val_dataset_original = W.dataset.normalize_data(val_dataset)
 val_dataset = val_dataset_original[..., :1] #to gray

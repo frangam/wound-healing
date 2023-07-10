@@ -193,12 +193,12 @@ def generate_wound(time_intervals, seed_left, seed_right, seed_width, IMG_WIDTH=
         if l < r:
             jump = 1
             width = min(jump, max(1, r - l)) + 1
-            l += np.random.randint(1, width)
+            l += np.rint(np.random.normal(1, width, 1))[0].astype(np.int32) # np.random.randint(1, width)
 
         if r > l:
             jump = 1
             width = min(jump, max(1, r - l)) + 1
-            r -= np.random.randint(1, width)
+            r -= np.rint(np.random.normal(1, width, 1))[0].astype(np.int32) #np.random.randint(1, width)
 
         if i == len(time_intervals) - 2:
             new_width = int((r - l) * width_reduction)

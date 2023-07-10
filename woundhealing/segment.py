@@ -1,3 +1,5 @@
+#!venv/bin/python3
+
 """
 Contains functions for segment the wound in an image.
 
@@ -15,6 +17,12 @@ import os
 import torch
 import torchvision
 import pandas as pd
+import scipy.stats
+from scipy import stats
+import mahotas.features.texture as mht
+
+
+
 
 print("PyTorch version:", torch.__version__)
 print("Torchvision version:", torchvision.__version__)
@@ -143,27 +151,209 @@ def predict_masks(predictor, image, input_point, input_label, input_boxes, multi
     )
     return masks, scores, logits
 
-def get_area_perimeter(image, pixel_size=3.2):
-    img_uint8 = image
+def get_area_perimeter(image, pixel_size=1):
+    img_uint8 = image.astype(np.uint8)
     imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
     gray = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
     ret, thresh = cv2.threshold(gray, 100, 255, 0)
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    # print("Number of contours in image:", len(contours))
+    print("Number of contours in image:", len(contours))
     cnt = contours[0]
     area = cv2.contourArea(cnt)
+    print("Area:", area)
 
     # Convert the area from pixels to square micrometers using the pixel size in micrometers
     area_um2 = area * pixel_size * pixel_size
+    print("area_um2:", area_um2)
 
     # Calculate the perimeter in pixels
     perimeter_pixels = cv2.arcLength(cnt, True)
+    print("perimeter_pixels:", perimeter_pixels)
+
 
     # Convert the perimeter from pixels to micrometers using the pixel size in micrometers
     perimeter_um = perimeter_pixels * pixel_size
+    print("perimeter_um:", perimeter_um)
+
 
     return area_um2, perimeter_um
+    
 
+def get_area_perimeter_2(mask, image_mask_gray, pixel_size=1, wound_frame_name="monolayer_0_0"):
+    area_counting_trues = np.sum(mask) * pixel_size**2
+    print("recuento del area", area_counting_trues)
+
+    img_uint8 = image_mask_gray.astype(np.uint8)
+    imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
+    gray = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
+
+
+    # Use adaptive thresholding
+    ret,thresh = cv2.threshold(gray,10,255,0)
+
+    # Perform morphological closing
+    kernel = np.ones((30,30),np.uint8)
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+
+    # Use cv2.CHAIN_APPROX_NONE to get all the points in the contour
+    # Use cv2.CHAIN_APPROX_NONE to get all the points in the contour
+    contours,hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # contours = contours[1:]
+
+    print("Number of contours in image:", len(contours))
+    
+    max_area = -1
+    max_perimeter = -1
+    img1 = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+
+
+    # Loop through all the contours and calculate the area and perimeter for each
+    for i, cnt in enumerate(contours):
+        area = cv2.contourArea(cnt)
+        perimeter_pixels = cv2.arcLength(cnt, True)
+
+        if area < (img1.shape[0]*img1.shape[1])-10000 and area > max_area:
+            max_area = area
+            max_perimeter = perimeter_pixels
+
+            print(f"Contour {i}:")
+            # print(f"Area (pixels): {area}, Max Area (pixels): {max_area}")
+            # print(f"Perimeter (pixels): {perimeter_pixels}, Max Perimeter (pixels): {max_perimeter}")
+
+            # Draw the contour on the image and annotate it with its area and perimeter
+            img1 = cv2.drawContours(imgRGB, [cnt], -1, (0,255,255), 5)
+            # gray_to_save = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+
+            os.makedirs(f"results/segments/{wound_frame_name}/", exist_ok=True)
+            cv2.imwrite(f'results/segments/{wound_frame_name}/contours_{i}.png', img1)
+    
+    area_counting_trues = area_counting_trues / 10
+    area_counting_trues_um2 = area_counting_trues # * pixel_size**2
+    total_area_um2 = max_area # * pixel_size**2
+    total_perimeter_um = max_perimeter * pixel_size
+    print(f"Area (pixels): {area_counting_trues_um2}, Max Area (pixels): {total_area_um2}")
+    print(f" Max Perimeter (pixels): {total_perimeter_um}")
+
+    # Convert total area and perimeter from pixels to um
+   
+
+    return   area_counting_trues_um2, total_perimeter_um, total_area_um2
+
+
+def calculate_glcm_features(image):
+    # Calcular la matriz de coocurrencia de nivel de gris (GLCM)
+    glcm = mht.haralick(image, ignore_zeros=True, return_mean=True)
+    
+    # Obtener las características de textura del GLCM
+    contrast = glcm[2]
+    correlation = glcm[4]
+    energy = glcm[5]
+    homogeneity = glcm[8]
+    entropy = glcm[9]
+    
+    return contrast, correlation, energy, homogeneity, entropy
+
+
+
+
+# def calculate_glcm_features(image_gray, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=256):
+#     glcm = np.zeros((levels, levels, len(distances), len(angles)))
+
+#     for i, d in enumerate(distances):
+#         for j, a in enumerate(angles):
+#             shifted = np.roll(image_gray, int(np.round(d * np.cos(a))), axis=1)
+#             shifted = np.roll(shifted, int(np.round(d * np.sin(a))), axis=0)
+#             co_occurrence = np.zeros((levels, levels))
+
+#             for x in range(levels):
+#                 for y in range(levels):
+#                     mask = (image_gray == x) & (shifted == y)
+#                     co_occurrence[x, y] = np.sum(mask)
+
+#             glcm[:, :, i, j] = co_occurrence
+
+#     contrast = []
+#     correlation = []
+#     energy = []
+#     homogeneity = []
+#     entropy = []
+
+#     for i in range(len(distances)):
+#         for j in range(len(angles)):
+#             contrast.append(stats.greycoprops(glcm[:, :, i, j], 'contrast')[0, 0])
+#             correlation.append(stats.greycoprops(glcm[:, :, i, j], 'correlation')[0, 0])
+#             energy.append(stats.greycoprops(glcm[:, :, i, j], 'energy')[0, 0])
+#             homogeneity.append(stats.greycoprops(glcm[:, :, i, j], 'homogeneity')[0, 0])
+#             entropy.append(stats.entropy(glcm[:, :, i, j].ravel()))
+
+#     return contrast, correlation, energy, homogeneity, entropy
+
+def calculate_texture_features(image):
+    img_uint8 = image.astype(np.uint8)
+    imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
+    # Convertir la imagen a escala de grises
+    gray = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
+    contrast, correlation, energy, homogeneity, entropy = calculate_glcm_features(gray)
+    print("contrast", contrast,"correlation", correlation, "energy", energy, "homogeneity", homogeneity, "entropy", entropy)
+    
+    return  contrast, correlation, energy, homogeneity, entropy
+
+
+def calculate_color_features(image):
+    img_uint8 = image.astype(np.uint8)
+    imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
+    # Convertir la imagen a espacio de color HSV
+    hsv = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2HSV)
+
+    # Calcular la media y desviación estándar de los canales H, S y V
+    mean_hsv = np.mean(hsv, axis=(0, 1))
+    std_hsv = np.std(hsv, axis=(0, 1))
+
+    # # Calcular el histograma de colores
+    # hist = cv2.calcHist([hsv], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
+    # hist = cv2.normalize(hist, hist).flatten()
+
+    print("mean_hsv", mean_hsv, "std_hsv", std_hsv)
+    mH = mean_hsv[0]
+    mS = mean_hsv[1]
+    mV = mean_hsv[2]
+    sH = std_hsv[0]
+    sS = std_hsv[1]
+    sV = std_hsv[2]
+
+    return  mH, mS, mV, sH, sS, sV
+
+def calculate_edge_features(image):
+    img_uint8 = image.astype(np.uint8)
+    imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
+    # Convertir la imagen a escala de grises
+    gray = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
+
+    # Detectar bordes utilizando el operador de Canny
+    edges = cv2.Canny(gray, 50, 150)
+
+    # Calcular la cantidad de píxeles de borde
+    edge_pixels = np.count_nonzero(edges)
+    print("edge_pixels", edge_pixels)
+
+    return edge_pixels
+
+# def calculate_texture_features(image):
+#     img_uint8 = image.astype(np.uint8)
+#     imgRGB = cv2.cvtColor(img_uint8, cv2.COLOR_BGRA2RGB)
+#     # Convertir la imagen a escala de grises
+#     gray = cv2.cvtColor(imgRGB, cv2.COLOR_BGR2GRAY)
+
+#     # Calcular características de textura utilizando la matriz de co-ocurrencia de textura de niveles múltiples (MLTGLCM)
+#     glcm = cv2.glcm(gray, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
+#     contrast = cv2.glcm_feature(glcm, cv2.GLCM_CONTRAST)
+#     correlation = cv2.glcm_feature(glcm, cv2.GLCM_CORRELATION)
+#     energy = cv2.glcm_feature(glcm, cv2.GLCM_ENERGY)
+#     entropy = cv2.glcm_feature(glcm, cv2.GLCM_ENTROPY)
+#     homogeneity = cv2.glcm_feature(glcm, cv2.GLCM_HOMOGENITY)
+#     print("contrast", contrast, "correlation", correlation, "energy", energy, "entropy", entropy)
+
+#     return contrast, correlation, energy, entropy, homogeneity
 
 
 

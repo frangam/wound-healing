@@ -1,11 +1,19 @@
 import os
 import tensorflow as tf
 import tifffile
+import imageio
 
 
+PHOTO_INTERVAL = 3
 MONOLAYER = [0, 3, 6, 9, 12, 24, 27]
-SPHERES = [0, 3, 6, 9, 12, 15, 24]
+SPHERES = [0, 3, 6, 9, 12, 15]
 CELL_TYPES = {0: MONOLAYER, 1: SPHERES}
+
+def intervals_no_hours_taken_photo(celltype=0):
+    if celltype == 0: #monolayer
+        return ((24-12) // PHOTO_INTERVAL)-1
+    elif celltype == 1: #sphere
+        return ((MONOLAYER[-1] - SPHERES[-1]) // PHOTO_INTERVAL) -1
 
 def len_cell_type_time_step(celltype=0):
     try:
@@ -79,3 +87,11 @@ def get_pixel_size(tiff_path):
                         pixel_size *= 10  # Convertir de centímetros a micrómetros (μm)
                 return pixel_size
     return None
+
+def save_image_dataset_loaded(dataset, type):
+    for i, seq in enumerate(dataset):
+        for j, img in enumerate(seq):
+            spath = f"data/loaded/{type}/frames_{i}/"
+            os.makedirs(spath, exist_ok=True)
+            filename = f"{spath}image_{j}.png"
+            imageio.imsave(filename, img)

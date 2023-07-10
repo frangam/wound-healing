@@ -33,7 +33,7 @@ def main():
     W.utils.set_gpu(args.gpu_id)
 
     MONOLAYER = [0, 3, 6, 9, 12, 24, 27]
-    SPHERES = [0, 3, 6, 9, 12, 18, 24]
+    SPHERES = [0, 3, 6, 9, 12, 15]
 
 
 

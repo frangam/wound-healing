@@ -62,8 +62,8 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, n
         # print("frames shape", np.array(frames).shape)
         # # Check if there are enough frames in the example
         # if num_frames_initial + i + 1 <= len(example):
-        if include_original:
-            frames = example[: num_frames_initial + i + 1, ...]
+        # if include_original:
+        #     frames = example[: num_frames_initial + i + 1, ...]
         # else:
         #     # If not, create a black image and add it to frames
         #     black_image = np.zeros((1, h, w, 3))  # Added extra dimension
@@ -82,6 +82,8 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, n
 
         if not include_original:
             frames = np.concatenate((frames, predicted_frame), axis=0)
+        else:
+            frames = example[: num_frames_initial + i + 1, ...]
 
         # if len(sq_predicted_frame.shape) == 3:
         #     sq_predicted_frame = cv2.cvtColor(sq_predicted_frame, cv2.COLOR_BGR2GRAY)
@@ -121,7 +123,7 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, n
         # plt.imsave(image_filename, sq_predicted_frame, cmap="gray")
     
     
-    inc = "include_originals" if include_original else "no_include_originals_only_predictions"
+    inc = "incremental" if include_original else "sequential"
     orig_path = f"{save_path}{inc}/original/"
     pred_path = f"{save_path}{inc}/prediction/"
     os.makedirs(orig_path, exist_ok=True)
@@ -303,24 +305,28 @@ def main():
 
     '''
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
-    p.add_argument('--type', type=str, default="synth_monolayer", help='the cell type: synth_monolayer, real_monolayer')
-    p.add_argument('--prefix', type=str, default="synthetic")
+    p.add_argument('-g', '--gpu-id', type=int, default=0, help='the GPU device ID')
+    p.add_argument('-t', '--type', type=str, default="synth_monolayer", help='the cell type: synth_monolayer, real_monolayer')
+    p.add_argument('-p', '--prefix', type=str, default="synthetic")
     # p.add_argument('--inc-original', action='store_true', help="Flag to indicate include the original frames to predict the next frames")
-    p.add_argument('--just-predict', action='store_true', help="Flag to indicate just predict and not training")
-    p.add_argument('--fine-tune', action='store_true', help="Flag to indicate fine-tuning")
+    p.add_argument('-jp', '--just-predict', action='store_true', help="Flag to indicate just predict and not training")
+    p.add_argument('-f', '--fine-tune', action='store_true', help="Flag to indicate fine-tuning")
+    p.add_argument('-ft', '--fine-tune-type', action='store_true', help="Flag to indicate to use the fine-tuning specific on cell type")
     p.add_argument('--fine-tune-model', type=str, default="best_model.h5", help='path to the best model for fine-tuning')
-    p.add_argument('--m', type=int, default=0, help="The model architecture. 0: ConvLSTM, 1: Bi-directional ConvLSTM and U-Net")
+    p.add_argument('-m', '--m', type=int, default=0, help="The model architecture. 0: ConvLSTM, 1: Bi-directional ConvLSTM and U-Net")
     p.add_argument('--layers', type=int, default=5, help="The number of hidden layers")
-    p.add_argument('--ts', type=float, default=.8, help='the train split percentage')
-    p.add_argument('--bz', type=int, default=32, help='the GPU batch size')
-    p.add_argument('--epochs', type=int, default=50, help='the deep learning epochs')
-    p.add_argument('--patience', type=int, default=10, help='the patience hyperparameter')
+    p.add_argument('--ts', type=float, default=.3, help='the test split percentage')
+    p.add_argument('-bz', '--bz', type=int, default=32, help='the GPU batch size')
+    p.add_argument('-e', '--epochs', type=int, default=50, help='the deep learning epochs')
+    p.add_argument('-pa', '--patience', type=int, default=10, help='the patience hyperparameter')
     p.add_argument('--w', type=int, default=64, help='the width')
     p.add_argument('--h', type=int, default=64, help='the height')
     p.add_argument('--th-white', type=int, default=.85, help='the threshold to draw with wite color (greater than this value)')
-    p.add_argument('--start-frame', type=int, default=2, help='the start frame to predict')
-    p.add_argument('--frames-pred', type=int, default=5, help='the number of frames to predict')
+    p.add_argument('-sf', '--start-frame', type=int, default=2, help='the start frame to predict')
+    p.add_argument('-fp', '--frames-pred', type=int, default=5, help='the number of frames to predict')
+    p.add_argument('-s', '--save-real-loaded', action='store_true', help="Flag to indicate saving real data when loaded")
+    p.add_argument('-c','--concat', action='store_true', help="Flag to indicate concatenating all cell types")
+
 
 
 
@@ -333,14 +339,47 @@ def main():
 
   
     # dataset = W.dataset.load_images(base_dir="data/", image_type=args.type, remove_first_frame=args.type=="synth_monolayer" or args.type=="real_monolayer", resize_width=args.w, resize_height=args.h)
-    dataset = W.dataset.load_images(base_dir="data/", image_type=args.type, remove_first_frame=False, resize_width=args.w, resize_height=args.h)
+    if "synthetic" in args.prefix:
+        dataset = W.dataset.load_images(base_dir="data/", image_type="synth_monolayer_old", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=False)
+        dataset2 = W.dataset.load_images(base_dir="data/", image_type="synth_spheres_old", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=False)
+        # dataset3 = W.dataset.load_images(base_dir="data/", image_type="aug_synth_monolayer", remove_first_frame=False, resize_width=args.w, resize_height=args.h)
+        # dataset4 = W.dataset.load_images(base_dir="data/", image_type="aug_synth_spheres", remove_first_frame=False, resize_width=args.w, resize_height=args.h)
+        # dataset = np.concatenate((dataset, dataset3), axis=0)
+        # dataset2 = np.concatenate((dataset2, dataset4), axis=0)
+    else:
+        dataset = W.dataset.load_images(base_dir="data/", image_type="real_monolayer", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=False)
+        dataset2 = W.dataset.load_images(base_dir="data/", image_type="real_spheres", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=False)
 
-    # dataset = W.dataset.load_images(base_dir="data/", image_type="monolayer", remove_first_frame=True, resize_width=64, resize_height=64)
+    if args.save_real_loaded:
+        W.utils.save_image_dataset_loaded(dataset, "real_monolayer")
+        W.utils.save_image_dataset_loaded(dataset2, "real_spheres")
+
+        # dataset3 = W.dataset.load_images(base_dir="data/", image_type="aug_real_monolayer", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=False)
+        # dataset4 = W.dataset.load_images(base_dir="data/", image_type="aug_real_spheres", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=False)
+        # dataset = np.concatenate((dataset, dataset3), axis=0)
+        # dataset2 = np.concatenate((dataset2, dataset4), axis=0)
+    print("dataset (monolayer) shape:", dataset.shape)
+    print("dataset (spheres) shape:", dataset2.shape)
+    if args.concat:
+        labels1= np.repeat(0, dataset.shape[0])
+        labels2= np.repeat(1, dataset2.shape[0])
+        dataset = np.concatenate((dataset, dataset2), axis=0)
+        labels = np.concatenate((labels1, labels2), axis=0)
+
+        print('Primeras etiquetas:')
+        print(labels[:12])
+
+        print('Últimas etiquetas:')
+        print(labels[-12:])
+    else:
+        labels = None
+        if "spheres" in args.type:
+            dataset = dataset2
 
     print(dataset.shape)
 
     # Split the dataset
-    train_dataset, val_dataset = W.dataset.split_dataset(dataset, args.ts)
+    train_dataset, val_dataset = W.dataset.split_dataset(dataset, labels, args.ts, seed=33)
 
     # Normalize the data
     train_dataset = W.dataset.normalize_data(train_dataset)
@@ -367,7 +406,12 @@ def main():
     # model = W.model.create_model(x_train.shape[2:], architecture=0, num_layers=10)
 
     if args.fine_tune and args.fine_tune_model != "":
-        model = load_model(f"results/next-image/synthetic/model_{args.m}/{args.fine_tune_model}", custom_objects={'ssim': ssim, 'mse': mse, 'psnr': psnr, 'MultiHeadSelfAttention': MultiHeadSelfAttention, 'TransformerBlock': TransformerBlock})
+        if args.fine_tune_type:
+            p = "synth-monolayer" if "monolayer" in args.type else "synth-spheres"
+        else: #just synthetic path
+            p = "synthetic"
+
+        model = load_model(f"results/next-image/{p}/model_{args.m}/{args.fine_tune_model}", custom_objects={'ssim': ssim, 'mse': mse, 'psnr': psnr, 'MultiHeadSelfAttention': MultiHeadSelfAttention, 'TransformerBlock': TransformerBlock})
         
         print("loading pre-trained model:", args.fine_tune_model)
     else:
@@ -438,7 +482,7 @@ def main():
 
         ##################################################################
 
-    if args.m == 19:
+    if args.m == 19 or args.m==20:
         best_model = model
     else:
         best_model = tf.keras.models.load_model(f"{results_dir}best_model.h5", custom_objects={'ssim': ssim, 'mse': mse, 'psnr': psnr, 'MultiHeadSelfAttention': MultiHeadSelfAttention, 'TransformerBlock': TransformerBlock})

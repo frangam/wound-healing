@@ -122,8 +122,8 @@ def calculate_metrics(image_dir="results/next-image/synthetic/original/", target
     # covmean = sqrtm(sigma1.dot(sigma2))
     # fid = diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * np.trace(covmean)
 
-    print("\nmean_ssim", mean_ssim)
-    print("mean_mse", mean_mse)
+    print("\nmean_ssim", np.round(mean_ssim, 3))
+    print("mean_mse", np.round(mean_mse, 3))
     # print("mean_pl", mean_pl)
     # print("fid", fid)
 
@@ -136,7 +136,10 @@ Examples:
 
 ** For assessing synthetic images:
 -- including the original frames in every prediction
-./ssim.py --base results/next-image/synthetic/model_0/include_originals/
+./ssim.py --base results/next-image/synthetic/model_9/include_originals/
+
+./ssim.py --base results/next-image/real/model_9/include_originals/
+
 
 -- only predictions
 ./ssim.py --base results/next-image/synthetic/model_0/no_include_originals_only_predictions/
@@ -151,12 +154,13 @@ Examples:
 
 '''
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-p.add_argument('--base', type=str, default="results/next-image/real/", help='the base directory path')
-p.add_argument('--source', type=str, default="original", help='the source directory name')
-p.add_argument('--target', type=str, default="prediction", help='the target directory name')
-p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
+p.add_argument('-b', '--base', type=str, default="results/next-image/real/", help='the base directory path')
+p.add_argument('-s', '--source', type=str, default="original", help='the source directory name')
+p.add_argument('-t-', '--target', type=str, default="prediction", help='the target directory name')
+p.add_argument('-g', '--gpu-id', type=int, default=1, help='the GPU device ID')
 
 args = p.parse_args()
+print("GPU ID:", args.gpu_id)
 W.utils.set_gpu(args.gpu_id)
 
 
