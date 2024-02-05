@@ -64,6 +64,9 @@ python -m pytorch_fid results/next-image/synthetic/original/ results/next-image/
 
 ```sh
 python -m pytorch_fid ~/proyectos/TGEN-timeseries-generation/results/evaluation_synthetic_quality/loso/exp-classes-all-classes/data/fold_0/real_train/ ~/proyectos/TGEN-timeseries-generation/results/evaluation_synthetic_quality/loso/exp-classes-all-classes/data/fold_0/train/  --device cuda:0
+
+
+python -m pytorch_fid ~/proyectos/TGEN-timeseries-generation/results/evaluation_synthetic_quality/loto/real-train-data/data/fold_0/  ~/proyectos/TGEN-timeseries-generation/results/evaluation_synthetic_quality/loto/epochs-10000/data/fold_0/ --device cuda:1 
 ````
 
 ## Generating a compatible `.npz` archive from a dataset

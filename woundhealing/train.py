@@ -228,10 +228,15 @@ def preprocess_data(X):
 
 def create_model(image_shape, ninputs=3, noutputs=3, architecture=0, hidden_units=18, activation_function="sigmoid", learning_rate=0.05):
     model = Sequential()
+    print("X input shape", ninputs)
+    print("images input shape", image_shape)
+    print("n outputs", noutputs)
 
     if architecture==0:
-        model.add(Dense(hidden_units, input_dim=ninputs, activation=activation_function, kernel_regularizer=l2(0.01)))
-        model.add(Dense(noutputs, activation='linear'))
+        input_tabular = Input(shape=ninputs)
+        dense_layer = Dense(hidden_units, activation=activation_function, kernel_regularizer=l2(0.01))(input_tabular)
+        output = Dense(noutputs, activation='linear')(dense_layer)
+        model = Model(inputs=input_tabular, outputs=output)
     elif architecture==1:
         print("X input shape", ninputs)
         print("images input shape", image_shape)
@@ -258,8 +263,22 @@ def create_model(image_shape, ninputs=3, noutputs=3, architecture=0, hidden_unit
         model = Model(inputs=[input_tabular, input_image], outputs=output)
         # dropout_rate = 0.2
         # model.add(Dropout(dropout_rate))
-
-
+    elif architecture == 2:
+        input_image = Input(shape=(ninputs[0], ninputs[1]))
+        conv1 = Conv2D(32, (3, 3), activation='relu')(input_image)
+        pool1 = MaxPooling2D((2, 2))(conv1)
+        conv2 = Conv2D(64, (3, 3), activation='relu')(pool1)
+        pool2 = MaxPooling2D((2, 2))(conv2)
+        flat = Flatten()(pool2)
+        dense1 = Dense(hidden_units, activation=activation_function)(flat)
+        output = Dense(noutputs, activation='linear')(dense1)
+        model = Model(inputs=input_image, outputs=output)
+    # Architecture with Single LSTM Layer
+    elif architecture == 3:
+        input_tabular = Input(shape=(ninputs[0], ninputs[1]))
+        lstm = LSTM(hidden_units, activation=activation_function)(input_tabular)
+        output = Dense(noutputs, activation='linear')(lstm)
+        model = Model(inputs=input_tabular, outputs=output)
 
 
     optimizer = "adam" # Adam(learning_rate=learning_rate)
@@ -282,9 +301,9 @@ def create_model(image_shape, ninputs=3, noutputs=3, architecture=0, hidden_unit
 
 METRICS = ['MeanSquaredError', 'MeanAbsoluteError', 'RootMeanSquaredError']  # The names of the metrics (this order is important)
 
-def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_train, images_test, original_shape_y_test, scaler_y, timesteps_test, epochs):
+def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_train, images_test, original_shape_y_test, scaler_y, timesteps_test, epochs, architecture):
     # Define the checkpoint path and filename
-    checkpoint_path = f"results/train/best_model.h5"
+    checkpoint_path = f"results/train/architecture_{architecture}/best_model.h5"
 
     # Define the ModelCheckpoint callback
     checkpoint = ModelCheckpoint(
@@ -295,9 +314,15 @@ def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_tra
         verbose=1
     )
 
-    history = model.fit([X_train, images_train], y_train, validation_data=([X_test, images_test], y_test), 
-                        epochs=epochs, batch_size=16, callbacks=[checkpoint], verbose=1)#, validation_data=(X_test, y_test))
-    score = model.evaluate([X_test, images_test], y_test, verbose=1)
+
+    if architecture == 1: #LSTM+Conv2D
+        history = model.fit([X_train, images_train], y_train, validation_data=([X_test, images_test], y_test), 
+                            epochs=epochs, batch_size=16, callbacks=[checkpoint], verbose=1)#, validation_data=(X_test, y_test))
+        score = model.evaluate([X_test, images_test], y_test, verbose=1)
+    else:
+        history = model.fit(X_train, y_train, validation_data=(X_test, y_test), 
+                            epochs=epochs, batch_size=16, callbacks=[checkpoint], verbose=1)#, validation_data=(X_test, y_test))
+        score = model.evaluate(X_test, y_test, verbose=1)
 
     # Extract metric names and indices from the model's metrics_names
     metric_names = model.metrics_names
@@ -311,8 +336,10 @@ def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_tra
             metric_name = f'{metric}_output_{output_index}'
             metric_index = metric_names.index(metric_name)
             avg_metrics[f'{metric}_{output_index}'] = score[metric_index]
-
-    predictions = model.predict([X_test, images_test])
+    if architecture == 1: #LSTM+Conv2D
+        predictions = model.predict([X_test, images_test])
+    else:
+        predictions = model.predict(X_test)
     y_test = y_test.reshape((original_shape_y_test[0]*original_shape_y_test[1], original_shape_y_test[2]))
     y_test = scaler_y.inverse_transform(y_test)
 
@@ -338,7 +365,7 @@ def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_tra
         
     })
 
-    results.to_csv('results/train/predictions_vs_true.csv', index=False)
+    results.to_csv(f'results/train/architecture_{architecture}/predictions_vs_true.csv', index=False)
 
 
     history_dict = history.history
@@ -354,7 +381,7 @@ def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_tra
     plt.ylabel("Loss/Accuracy")
     plt.legend(loc="best", bbox_to_anchor=(0.5, 0., 0.5, 0.5))
     plt.tight_layout()
-    plt.savefig(f"results/train/history_loss_plot.png", dpi=300)
+    plt.savefig(f"results/train/architecture_{architecture}/history_loss_plot.png", dpi=300)
 
     plt.style.use("ggplot")
     plt.figure(figsize=(10, 8))  # Change to whatever size fits best
@@ -374,7 +401,7 @@ def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_tra
     plt.ylabel("Loss/Accuracy")
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     plt.tight_layout()
-    plt.savefig(f"results/train/history_MSE_loss_plot.png", dpi=300)
+    plt.savefig(f"results/train/architecture_{architecture}/history_MSE_loss_plot.png", dpi=300)
 
     plt.style.use("ggplot")
     plt.figure(figsize=(10, 8))  # Change to whatever size fits best
@@ -394,7 +421,7 @@ def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_tra
     plt.ylabel("Loss/Accuracy")
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     plt.tight_layout()
-    plt.savefig(f"results/train/history_MAE_loss_plot.png", dpi=300)
+    plt.savefig(f"results/train/architecture_{architecture}/history_MAE_loss_plot.png", dpi=300)
 
     plt.style.use("ggplot")
     plt.figure(figsize=(10, 8))  # Change to whatever size fits best
@@ -414,7 +441,7 @@ def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_tra
     plt.ylabel("Loss/Accuracy")
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     plt.tight_layout()
-    plt.savefig(f"results/train/history_RMSE_loss_plot.png", dpi=300)
+    plt.savefig(f"results/train/architecture_{architecture}/history_RMSE_loss_plot.png", dpi=300)
 
     plt.style.use("ggplot")
     plt.figure(figsize=(10, 8))  # Change to whatever size fits best
@@ -448,7 +475,7 @@ def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_tra
     plt.ylabel("Loss/Accuracy")
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     plt.tight_layout()
-    plt.savefig(f"results/train/history_all_loss_plot.png", dpi=300)
+    plt.savefig(f"results/train/architecture_{architecture}/history_all_loss_plot.png", dpi=300)
 
 
     return avg_metrics
@@ -460,7 +487,7 @@ def main():
     '''
     Examples of use:
     
-    ./woundhealing/train.py -r -p results/real_segments.csv -a 0 -g 3
+    nohup ./woundhealing/train.py -r -p results/real_segments.csv -a 0 -g 3 > logs/train-arch-0.log &
     '''
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('-p', '--path', type=str, default='results/synthetic_segments.csv', help='the segmentation path')
@@ -634,8 +661,7 @@ def main():
 
         print("X_train_normalized shape", X_train_normalized.shape, "y_train_normalized shape", y_train_normalized.shape, "images_train_normalized shape", images_train_normalized.shape)
         print("X_test_normalized shape", X_test_normalized.shape, "y_test_normalized shape", y_test_normalized.shape, "images_test_normalized shape", images_test_normalized.shape)
-
-        avg_metrics = train_and_evaluate_model(model, X_train_normalized, y_train_normalized, X_test_normalized, y_test_normalized, images_train_normalized, images_test_normalized, original_shape_y_test, scaler_y, timesteps_test, epochs)
+        avg_metrics = train_and_evaluate_model(model, X_train_normalized, y_train_normalized, X_test_normalized, y_test_normalized, images_train_normalized, images_test_normalized, original_shape_y_test, scaler_y, timesteps_test, epochs, architecture)
         print(f"METRICS: {avg_metrics}")
         results_df = pd.DataFrame(avg_metrics, index=[0]).T.reset_index()
         results_df.columns = ['Metric', 'Value']
@@ -669,8 +695,8 @@ def main():
             # X_test = preprocess_data(X_test)
 
             # print("fold", f_i, "train shapes:", X_train.shape, y_train.shape, "test shapes:", X_test.shape, y_test.shape)
-
-            avg_metrics = train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_train, images_test, epochs)
+                                               
+            avg_metrics = train_and_evaluate_model(model, X_train, y_train, X_test, y_test, images_train, images_test, original_shape_y_test=None, scaler_y=None, timesteps_test=None, epochs=epochs, architecture=architecture)
             print(f"fold-{f_i}. {avg_metrics}")
             scores.append({**{'Fold': len(scores) + 1}, **avg_metrics})
         
@@ -682,10 +708,10 @@ def main():
         results_df = pd.concat([results_df, pd.DataFrame(avg_metrics, index=[0])], ignore_index=True)
 
     
-    path = f"results/train/"
+    path = f"results/train/architecture_{architecture}/"
     os.makedirs(path, exist_ok=True)
     path = f"{path}real" if args.real else f"{path}synth"
-    results_df.to_csv(f'{path}_train_eval_type_{args.eval_type}.csv', index=False)
+    results_df.to_csv(f'{path}_train_arch_{architecture}_eval_type_{args.eval_type}.csv', index=False)
 
     print(f"Average MSE: {avg_metrics}")
 
