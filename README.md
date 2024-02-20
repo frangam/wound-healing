@@ -5,7 +5,7 @@
 
 Software for Predicting the Dynamic Evolution of Tumor Migration with Artificial Intelligence in Wound Healing Assays.
 
-[[`Paper`]Coming Soon] [[`Dataset`](https://doi.org/10.5281/zenodo.8131123)] [[`BibTeX`](#citing-pwpf)]
+[[`Paper`]Coming Soon] [[`Dataset`](https://doi.org/10.5281/zenodo.8131123)] [[`BibTeX`](#citation)]
 
 ## Model architectures
 <p float="left">
@@ -79,7 +79,7 @@ predictions = quantifying_model.predict([X_test, images_test])
 We use a combination of [Meta's Segment Anything model](https://github.com/facebookresearch/segment-anything) and [MedSAM model]()
 
 
-## Citation
+## <a name="Citation"></a>Citation
 
 If you use our code in your research, please use the following BibTeX entry:
 
