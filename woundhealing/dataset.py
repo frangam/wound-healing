@@ -205,8 +205,8 @@ def split_dataset(sequences, next_frames, labels, ids, train_ratio=0.6, val_rati
     seed (int): The random seed for reproducibility.
 
     Returns:
-    Tuple[np.array, np.array, np.array, np.array, np.array, np.array, np.array, np.array, np.array]: 
-    The training, validation, and test datasets and labels.
+    Tuple[np.array, np.array, np.array, np.array, np.array, np.array, np.array, np.array, np.array, np.array, np.array, np.array]: 
+    The training, validation, and test datasets, next frames, labels, and IDs.
     """
     np.random.seed(seed)
 
@@ -215,16 +215,18 @@ def split_dataset(sequences, next_frames, labels, ids, train_ratio=0.6, val_rati
 
     # Obtener los IDs únicos
     unique_ids = np.unique(ids)
+    unique_labels = np.array([labels[ids == uid][0] for uid in unique_ids])
 
     # Dividir los IDs únicos en conjuntos de entrenamiento y restante
-    train_ids, remaining_ids = train_test_split(unique_ids, test_size=(val_ratio + test_ratio), random_state=seed, stratify=labels)
+    train_ids, remaining_ids = train_test_split(unique_ids, test_size=(val_ratio + test_ratio), random_state=seed, stratify=unique_labels)
 
     # Calcular la proporción de validación y prueba en el conjunto restante
     remaining_ratio = val_ratio + test_ratio
     val_ratio_adjusted = val_ratio / remaining_ratio
 
     # Dividir los IDs restantes en conjuntos de validación y prueba
-    val_ids, test_ids = train_test_split(remaining_ids, test_size=test_ratio / remaining_ratio, random_state=seed, stratify=labels[np.isin(ids, remaining_ids)])
+    remaining_labels = unique_labels[np.isin(unique_ids, remaining_ids)]
+    val_ids, test_ids = train_test_split(remaining_ids, test_size=test_ratio / remaining_ratio, random_state=seed, stratify=remaining_labels)
 
     # Crear máscaras para seleccionar los datos correspondientes a los IDs de cada conjunto
     train_mask = np.isin(ids, train_ids)
@@ -241,6 +243,9 @@ def split_dataset(sequences, next_frames, labels, ids, train_ratio=0.6, val_rati
     train_labels = labels[train_mask]
     val_labels = labels[val_mask]
     test_labels = labels[test_mask]
+    train_ids = ids[train_mask]
+    val_ids = ids[val_mask]
+    test_ids = ids[test_mask]
 
     print("Proporción en el conjunto inicial:")
     print(np.bincount(labels) / len(labels))
@@ -254,7 +259,7 @@ def split_dataset(sequences, next_frames, labels, ids, train_ratio=0.6, val_rati
     print("Proporción en el conjunto de prueba:")
     print(np.bincount(test_labels) / len(test_labels))
 
-    return train_sequences, val_sequences, test_sequences, train_next_frames, val_next_frames, test_next_frames, train_labels, val_labels, test_labels
+    return train_sequences, val_sequences, test_sequences, train_next_frames, val_next_frames, test_next_frames, train_labels, val_labels, test_labels, train_ids, val_ids, test_ids
 
 
 def normalize_data(dataset):
@@ -290,44 +295,20 @@ def create_shifted_frames(data):
     """
     Create shifted frames for model training.
 
-    This function takes a dataset of sequences and generates multiple input-output pairs 
-    for training a model to predict the next frame in a sequence. For each sequence in the 
-    dataset, it creates several training examples by shifting the frames, allowing the model 
-    to learn to predict each frame from the previous frames.
-
     Parameters:
-    data (np.array): The dataset used to create shifted frames. 
+    data (np.array): The dataset used to create shifted frames.
                      The shape of the data should be (num_sequences, sequence_length, height, width, channels).
 
     Returns:
     Tuple[np.array, np.array, np.array]: The input data (x), the target shifted frames (y),
                                          and an array of sequence IDs.
-                                         The shape of x will be (num_examples, sequence_length-1, height, width, channels),
-                                         the shape of y will be (num_examples, 1, height, width, channels),
-                                         and the shape of ids will be (num_examples,).
-    Example:
-    If the input data has sequences of 8 frames, this function will generate the following pairs:
-
-    Original Sequence:
-    Sequence 1: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6, Frame7, Frame8]
-
-    Generated Pairs:
-    x: [Frame1, 0, 0, 0, 0, 0, 0]                 -> y: [Frame2] -> id: 0
-    x: [Frame1, Frame2, 0, 0, 0, 0, 0]           -> y: [Frame3] -> id: 0
-    x: [Frame1, Frame2, Frame3, 0, 0, 0, 0, 0]   -> y: [Frame4] -> id: 0
-    x: [Frame1, Frame2, Frame3, Frame4, 0, 0, 0, 0] -> y: [Frame5] -> id: 0
-    x: [Frame1, Frame2, Frame3, Frame4, Frame5, 0, 0, 0] -> y: [Frame6] -> id: 0
-    x: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6, 0, 0] -> y: [Frame7] -> id: 0
-    x: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6, Frame7, 0] -> y: [Frame8] -> id: 0
-
-    This allows the model to learn to predict the next frame given any number of previous frames in the sequence.
     """
     num_sequences, sequence_length, height, width, channels = data.shape
     x = []
     y = []
     ids = []
     for seq_id in range(num_sequences):
-        for i in range(1, sequence_length):  # Start from 1 to avoid zero-length sequences
+        for i in range(1, sequence_length):
             seq_x = np.zeros((sequence_length - 1, height, width, channels))
             seq_x[:i, :, :, :] = data[seq_id, :i, :, :, :]
             x.append(seq_x)
