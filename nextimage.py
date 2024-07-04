@@ -274,6 +274,7 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
         original_image.save(os.path.join(orig_path, f"original_frame_{timestep}_{example_index}_{i}.png"))
 
         # Guardar el frame predicho
+        predicted_frame = np.squeeze(predicted_frame)  # Ensure 2D
         predicted_frame = (predicted_frame / np.max(predicted_frame) * 255).astype(np.uint8)
         if predicted_frame.ndim == 3:
             predicted_frame = predicted_frame[:, :, 0]
@@ -294,7 +295,6 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
     plt.tight_layout()
     plt.savefig(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/predictions_{example_index}.png", bbox_inches='tight', pad_inches=0)
     plt.close()
-
 
 
     
@@ -644,11 +644,11 @@ def main():
     print("total images",args.frames_pred)
 
 
-    # Generating predictions
+    # # Generating predictions
     # for i in range(len(x_val)):
     #     print("generating validation predictions, id:", i)
-    #     predict_and_visualize(best_model, x_val, y_val, "validation", results_dir, example_index=i, include_original=True)
-    #     predict_and_visualize(best_model, x_val, y_val, "validation", results_dir, example_index=i, include_original=False)
+    #     predict_and_visualize(best_model, x_val, y_val, val_ids, "validation", results_dir, example_index=i, include_original=True)
+    #     predict_and_visualize(best_model, x_val, y_val, val_ids, "validation", results_dir, example_index=i, include_original=False)
 
     for i in range(len(x_test)-10, len(x_test)):
         print("generating test predictions, id:", i)
