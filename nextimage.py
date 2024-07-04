@@ -224,11 +224,13 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
     example_x = x_val[example_index, ...]
     frames = example_x.copy()
 
-    # Determinar el número de predicciones necesarias
+    # Obtener el ID de la secuencia del ejemplo
     sequence_id = ids_val[example_index]
+    # Obtener los índices de la secuencia completa con el mismo ID
     sequence_indices = np.where(ids_val == sequence_id)[0]
-    start_index = np.where(sequence_indices == example_index)[0][0]
-    num_predictions_needed = 1 if include_original else len(sequence_indices) - start_index
+    # Calcular el timestep actual basado en la posición del example_index
+    current_timestep = np.where(sequence_indices == example_index)[0][0] + 1
+    num_predictions_needed = 1 if include_original else len(sequence_indices) - current_timestep
 
     predictions = []
 
@@ -240,11 +242,11 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
     os.makedirs(pred_path, exist_ok=True)
 
     # Crear la figura para visualizar
-    num_frames_to_show = example_x.shape[0] + (1 if include_original else num_predictions_needed)
+    num_frames_to_show = current_timestep + num_predictions_needed
     fig, axes = plt.subplots(2, num_frames_to_show, figsize=(num_frames_to_show * 2, 4))
 
     # Visualizar frames originales
-    for i in range(example_x.shape[0]):
+    for i in range(current_timestep):
         frame = example_x[i]
         frame = (frame / np.max(frame) * 255).astype(np.uint8)
         frame = np.squeeze(frame)  # Ensure 2D
@@ -264,8 +266,8 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
         predictions.append(np.squeeze(predicted_frame))
 
         # Guardar el frame original
-        timestep = example_x.shape[0] + i + 1
-        original_frame = y_val[sequence_indices[start_index + i]]
+        timestep = current_timestep + i
+        original_frame = y_val[sequence_indices[current_timestep + i - 1]]
         original_frame = (original_frame / np.max(original_frame) * 255).astype(np.uint8)
         original_frame = np.squeeze(original_frame)  # Ensure 2D
         if original_frame.ndim == 3:
@@ -282,13 +284,13 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
         predicted_image.save(os.path.join(pred_path, f"prediction_frame_{timestep}_{example_index}_{i}.png"))
 
         # Visualizar frame original y predicho
-        axes[0, example_x.shape[0] + i].imshow(original_frame, cmap="gray")
-        axes[0, example_x.shape[0] + i].set_title(f"Next Frame {timestep}")
-        axes[0, example_x.shape[0] + i].axis("off")
+        axes[0, current_timestep + i].imshow(original_frame, cmap="gray")
+        axes[0, current_timestep + i].set_title(f"Next Frame {timestep}")
+        axes[0, current_timestep + i].axis("off")
 
-        axes[1, example_x.shape[0] + i].imshow(predicted_frame, cmap="gray")
-        axes[1, example_x.shape[0] + i].set_title(f"Predicted Frame {timestep}")
-        axes[1, example_x.shape[0] + i].axis("off")
+        axes[1, current_timestep + i].imshow(predicted_frame, cmap="gray")
+        axes[1, current_timestep + i].set_title(f"Predicted Frame {timestep}")
+        axes[1, current_timestep + i].axis("off")
 
     # Guardar la figura con todas las predicciones
     os.makedirs(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/", exist_ok=True)
