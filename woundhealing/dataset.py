@@ -21,7 +21,7 @@ from tqdm import tqdm
 from PIL import Image
 from . import utils
 
-def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_frame=False, resize_width=None, resize_height=None, remove_types=['synth_monolayer', 'real_monolayer', 'synth_spheres', 'real_spheres'], load_max=100, fill=False):
+def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_frame=False, resize_width=None, resize_height=None, remove_types=['synth_monolayer', 'real_monolayer', 'synth_spheres', 'real_spheres', 'synth_monolayer_old', 'synth_spheres_old'], load_max=100, fill=False):
     """
     Load a dataset of images from specified directories.
 
@@ -84,9 +84,15 @@ def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_fra
         frame_files.sort(key=lambda x: int(x.split('.')[0].split('_')[1])) # Sort frame files in order
         
         if remove_first_frame and image_type in remove_types:
+            print("Removing first frame for ",image_type)
             frame_files = frame_files[1:] # Remove the first frame if the condition is met
+        else:
+            print("NOT Removing first frame for ",image_type)
+
         len_f = len(frame_files)
+        print("Total frames:", len_f, frame_files)
         for t, file in enumerate(tqdm(frame_files, desc='Loading images', leave=False)):
+
             image = cv2.imread(os.path.join(frame_path, file))
             # Resize the image if desired
             if resize_width and resize_height:
@@ -96,6 +102,7 @@ def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_fra
             # # --- add the last image to fill no photos taken
             if fill and (('real_monolayer' in image_type and t+1 == utils.len_cell_type_time_step(0)-2) or ('spheres' in image_type and t+1 == utils.len_cell_type_time_step(1))):
                 if 'real_monolayer' in image_type:
+                    print("rellenando monolayer")
                     frame_images.append(image)
                     
                     int_no_photos = utils.intervals_no_hours_taken_photo(0)
@@ -109,6 +116,7 @@ def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_fra
                         aug = np.squeeze(aug)
                         frame_images.append(aug)
                 elif 'spheres' in image_type:
+                    print("rellenando spheres")
                     black_frame = np.zeros_like(image)
                     # if image_type == "real_spheres": #due to the segmentations we repeated the last segmentation... now we remove it
                         # frame_images = frame_images[:-1]
@@ -225,7 +233,7 @@ def create_shifted_frames(data):
 
     Returns:
     Tuple[np.array, np.array]: The input data (x) and the target shifted frames (y).
-                               The shape of x will be (num_examples, sequence_length, height, width, channels),
+                               The shape of x will be (num_examples, sequence_length-1, height, width, channels),
                                and the shape of y will be (num_examples, 1, height, width, channels).
 
     Example:
@@ -235,13 +243,12 @@ def create_shifted_frames(data):
     Sequence 1: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6, Frame7, Frame8]
 
     Generated Pairs:
-    x: [Frame1, 0, 0, 0, 0, 0, 0, 0]                 -> y: [Frame2]
-    x: [Frame1, Frame2, 0, 0, 0, 0, 0, 0]           -> y: [Frame3]
-    x: [Frame1, Frame2, Frame3, 0, 0, 0, 0, 0]      -> y: [Frame4]
-    x: [Frame1, Frame2, Frame3, Frame4, 0, 0, 0, 0] -> y: [Frame5]
-    x: [Frame1, Frame2, Frame3, Frame4, Frame5, 0, 0, 0] -> y: [Frame6]
-    x: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6, 0, 0] -> y: [Frame7]
-    x: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6, Frame7, 0] -> y: [Frame8]
+    x: [Frame1, 0, 0, 0, 0, 0]                              -> y: [Frame2]
+    x: [Frame1, Frame2, 0, 0, 0, 0]                         -> y: [Frame3]
+    x: [Frame1, Frame2, Frame3, 0, 0, 0]                    -> y: [Frame4]
+    x: [Frame1, Frame2, Frame3, Frame4, 0, 0]               -> y: [Frame5]
+    x: [Frame1, Frame2, Frame3, Frame4, Frame5, 0]          -> y: [Frame6]
+    x: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6]     -> y: [Frame7]
 
     This allows the model to learn to predict the next frame given any number of previous frames in the sequence.
     """
@@ -249,7 +256,7 @@ def create_shifted_frames(data):
     x = []
     y = []
     for i in range(1, sequence_length):  # Start from 1 to avoid zero-length sequences
-        seq_x = np.zeros((num_sequences, sequence_length, height, width, channels))
+        seq_x = np.zeros((num_sequences, sequence_length - 1, height, width, channels))
         seq_x[:, :i, :, :, :] = data[:, :i, :, :, :]
         x.append(seq_x)
         y.append(data[:, i:i+1, :, :, :])
