@@ -128,76 +128,87 @@ from woundhealing.model import ssim, mse, psnr, TransformerBlock, MultiHeadSelfA
 #     plt.savefig(f"{p}predictions_{example_index}")
 #     plt.close()
     
-def predict_and_visualize(model, x_val, original_val, data_type, save_path, num_frames_initial=2, num_frames_to_show=4, example_index=0, thr_whit=0, include_original=True):
+def predict_and_visualize(model, x_val, y_val, data_type, save_path, example_index=0, include_original=True):
     """
     Generate and visualize predicted frames.
 
     Parameters:
     - model (keras.Model): The trained model.
     - x_val (np.array): The validation dataset with shifted frames.
-    - original_val (np.array): The original validation dataset.
+    - y_val (np.array): The corresponding next frames for each shifted frame in x_val.
     - save_path (str): The path to save the visualization.
-    - num_frames_to_show (int): The number of frames to show in the visualization. 
-      Defaults to 6.
     - example_index (int): The index of the example from the validation dataset to visualize. 
       Defaults to 0.
     """
-    example = x_val[example_index, ...]
-    frames = example[:num_frames_initial, ...]
-    original_frames = original_val[example_index, num_frames_initial:, ...]
-    new_predictions = []
+    example_x = x_val[example_index, ...]
+    example_y = y_val[example_index, ...]
+    frames = example_x.copy()
 
-    for i in tqdm(range(num_frames_to_show), "Predicting..."):
-        new_prediction = model.predict(np.expand_dims(frames, axis=0))
-        new_prediction = np.squeeze(new_prediction, axis=0)
-        predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0)  # Take last frame predicted
-        sq_predicted_frame = np.squeeze(predicted_frame)
-
-        if not include_original:
-            frames = np.concatenate((frames, predicted_frame), axis=0)
-        else:
-            frames = example[: num_frames_initial + i + 1, ...]
-
-        new_predictions.append(sq_predicted_frame)
-
+    # Realizar la predicción
+    new_prediction = model.predict(np.expand_dims(frames, axis=0))
+    new_prediction = np.squeeze(new_prediction, axis=0)
+    predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0)  # Take last frame predicted
+    sq_predicted_frame = np.squeeze(predicted_frame)
+    
+    # Guardar las imágenes
     inc = "incremental" if include_original else "sequential"
     orig_path = f"{save_path}{inc}/{data_type}/original/"
     pred_path = f"{save_path}{inc}/{data_type}/prediction/"
     os.makedirs(orig_path, exist_ok=True)
     os.makedirs(pred_path, exist_ok=True)
-    fig, axes = plt.subplots(2, num_frames_to_show, figsize=(num_frames_to_show*2, 4))
+
+    # Guardar el frame siguiente (example_y) con el nombre basado en el timestep
+    timestep = example_x.shape[0] + 1
+    original_frame = example_y[0]
+    original_frame = (original_frame / np.max(original_frame) * 255).astype(np.uint8)
+    original_frame = np.squeeze(original_frame)  # Ensure 2D
+    if original_frame.ndim == 3:
+        original_frame = original_frame[:, :, 0]
+    original_image = Image.fromarray(original_frame, mode="L")
+    original_image.save(os.path.join(orig_path, f"original_frame_{timestep}_{example_index}.png"))
+
+    # Guardar el frame predicho con el nombre basado en el timestep
+    predicted_frame = (sq_predicted_frame / np.max(sq_predicted_frame) * 255).astype(np.uint8)
+    if predicted_frame.ndim == 3:
+        predicted_frame = predicted_frame[:, :, 0]
+    predicted_image = Image.fromarray(predicted_frame, mode="L")
+    predicted_image.save(os.path.join(pred_path, f"prediction_frame_{timestep}_{example_index}.png"))
     
-    for i in range(len(new_predictions)):
-        # Save predicted frame
-        predicted_frame = new_predictions[i]
-        predicted_frame = (predicted_frame / np.max(predicted_frame) * 255).astype(np.uint8)
-        predicted_frame = Image.fromarray(predicted_frame, mode="L")
-        predicted_frame.save(os.path.join(pred_path, f"prediction_frame_{example_index}_{i}.png"))
-
-        # Save original frame if available
-        if i < len(original_frames):
-            original_frame = original_frames[i]
-        else:
-            original_frame = np.zeros_like(predicted_frame)
-        original_frame = (original_frame / np.max(original_frame) * 255).astype(np.uint8)
-        original_frame = np.squeeze(original_frame)  # Ensure 2D
-        original_frame = Image.fromarray(original_frame, mode="L")
-        original_frame.save(os.path.join(orig_path, f"original_frame_{example_index}_{i}.png"))
-
-        # Visualize frames
-        axes[0, i].imshow(original_frame, cmap="gray")
-        axes[0, i].set_title(f"Original Frame {num_frames_initial + i + 1}")
+    # Crear la figura para visualizar
+    num_frames_to_show = example_x.shape[0] + 1
+    fig, axes = plt.subplots(2, num_frames_to_show, figsize=(num_frames_to_show * 2, 4))
+    
+    for i in range(example_x.shape[0]):
+        frame = example_x[i]
+        frame = (frame / np.max(frame) * 255).astype(np.uint8)
+        frame = np.squeeze(frame)  # Ensure 2D
+        if frame.ndim == 3:
+            frame = frame[:, :, 0]
+        axes[0, i].imshow(frame, cmap="gray")
+        axes[0, i].set_title(f"Input Frame {i + 1}")
         axes[0, i].axis("off")
 
-        axes[1, i].imshow(predicted_frame, cmap="gray")
-        axes[1, i].set_title(f"Predicted Frame {num_frames_initial + i + 1}")
+    # Mostrar el frame original (next frame)
+    axes[0, num_frames_to_show - 1].imshow(original_frame, cmap="gray")
+    axes[0, num_frames_to_show - 1].set_title("Next Frame")
+    axes[0, num_frames_to_show - 1].axis("off")
+
+    # Dejar un espacio en la fila de predicciones
+    for i in range(num_frames_to_show - 1):
         axes[1, i].axis("off")
 
-    # Save the figure with all predictions
+    # Mostrar el frame predicho justo debajo del frame original
+    axes[1, num_frames_to_show - 1].imshow(predicted_frame, cmap="gray")
+    axes[1, num_frames_to_show - 1].set_title("Predicted Frame")
+    axes[1, num_frames_to_show - 1].axis("off")
+    
+    # Guardar la figura con todas las predicciones
     os.makedirs(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/", exist_ok=True)
-    plt.savefig(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/predictions_{example_index}.png")
+    plt.tight_layout()
+    plt.savefig(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/predictions_{example_index}.png", bbox_inches='tight', pad_inches=0)
     plt.close()
 
+    
 def save_gif(frames, filename, duration=100):
     imageio.mimsave(filename, frames, "GIF", duration=duration)
 
@@ -523,17 +534,20 @@ def main():
     # total_frames_to_predict = (val_dataset.shape[1]//2 )
     print("total images",args.frames_pred)
 
-    # Generating predictions
-    for i in range(len(x_val)):
-        print("generating validation predictions")
-        predict_and_visualize(best_model, x_val, val_dataset, "validation", results_dir, num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, include_original=True)
-        predict_and_visualize(best_model, x_val, val_dataset, "validation", results_dir, num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, include_original=False)
 
-    for i in range(len(x_test)):
-        print("generating test predictions")
-        predict_and_visualize(best_model, x_test, test_dataset, "test", results_dir, num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, include_original=True)
-        predict_and_visualize(best_model, x_test, test_dataset, "test", results_dir, num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, include_original=False)
-    
+    # Generating predictions
+    # for i in range(len(x_val)):
+    #     print("generating validation predictions, id:", i)
+    #     predict_and_visualize(best_model, x_val, y_val, "validation", results_dir, example_index=i, include_original=True)
+    #     predict_and_visualize(best_model, x_val, y_val, "validation", results_dir, example_index=i, include_original=False)
+
+    for i in range(len(x_test)-10, len(x_test)):
+        print("generating test predictions, id:", i)
+        predict_and_visualize(best_model, x_test, y_test, "test", results_dir, example_index=i, include_original=True)
+        predict_and_visualize(best_model, x_test, y_test, "test", results_dir, example_index=i, include_original=False)
+
+
+
     # create_gifs(best_model, x_val, results_dir, last_frames_number=x_val.shape[1]//2)
     
     # final_results_video = f"{results_dir}video/"
