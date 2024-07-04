@@ -38,7 +38,13 @@ MedSAM: "sam_vit_b_01ec64.pth; model_type="vit_b"
 
 Example of run:
 
+segment real images
 ./gen_segments.py --gpu-id 3 
+
+segment synthetic images
+
+./gen_segments.py --gpu-id 3 --use-real 0
+
 '''
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 p.add_argument('--gpu-id', type=int, default=0, help='the GPU device ID')
@@ -131,19 +137,27 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                 else:    
                     image_array = pickle.loads(wound_matrix)
 
-                # print("image_array shape", image_array.shape)
+                print("image_array shape", image_array.shape)
 
                 # Segmentation...
                 # areas, perimeters = generar_segmentacion_herida(image_array, sam_checkpoint, model_type, device)
                 # masks = mask_generator.generate(image_array)
+                print("t:::>>", t+1, "utils.len_cell_type_time_step(cell_type)", utils.len_cell_type_time_step(cell_type), "Cell type:", cell_type)
 
-                if (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-1) or ((cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-2)):
+                if (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-2) or ((cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-3)):
+                    print("******** Reducing width//2-300 ********")
                     input_boxes = np.array([image_size[1]//2-300, 0, image_size[1]//2+300, image_size[0]])
                     masks, scores, logits = predict_masks(predictor_last_steps, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
+                elif (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-1) or ((cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-2)):
+                    print("***** Reducing width//2-250 *****")
+                    input_boxes = np.array([image_size[1]//2-250, 0, image_size[1]//2+250, image_size[0]])
+                    masks, scores, logits = predict_masks(predictor_last_steps, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
                 elif t+1 == utils.len_cell_type_time_step(cell_type) or ((cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-1)):
-                    input_boxes = np.array([image_size[1]//2-120, 0, image_size[1]//2+120, image_size[0]])
+                    print("** Reducing width//2-80 **")
+                    input_boxes = np.array([image_size[1]//2-80, 0, image_size[1]//2+80, image_size[0]])
                     masks, scores, logits = predict_masks(predictor_last_steps, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
                 else:
+                    print("************ Reducing width//3-50 ************")
                     input_boxes = np.array([image_size[1]//3-50, 0, image_size[1]-image_size[1]//3+50, image_size[0]])
                     masks, scores, logits = predict_masks(predictor, image_array, input_point, input_label, input_boxes, multimask_output=True) #multimask_output=True return 3 masks
 
@@ -204,16 +218,24 @@ for index, row in tqdm(df.iterrows(), total=df.shape[0], desc='Segmenting...'):
                         ax.axis('off')
                     
                     print("utils.len_cell_type_time_step(cell_type)", utils.len_cell_type_time_step(cell_type))
-                    #select the best fit for the mask, depending on the time in our case 
-                    if t+1 == utils.len_cell_type_time_step(cell_type) or (cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-1):
-                        print(f"[Cell type: {cell_type}]", "t:", t+1, "selecting first mask", f"[Score: {scores[-1]}]")
-                        best_mask = masks[0] #first mask
-                    elif (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-1) or (cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-2):
-                        print(f"[Cell type: {cell_type}]", "t:", t+1, "selecting middle mask", f"[Score: {scores[1]}]")
-                        best_mask = masks[1] #second mask
-                    else:
-                        print(f"[Cell type: {cell_type}]", "t:", t+1, "selecting first mask", f"[Score: {scores[0]}]")
-                        best_mask = masks[0] #first mask
+                    print(f"ID: {cell_id} || [Cell type: {cell_type}]", "t:", t+1, "selecting first mask", f"[Score: {scores[0]}]")
+                    best_mask = masks[0] #first mask
+                    # #select the best fit for the mask, depending on the time in our case 
+                    # if t+1 == utils.len_cell_type_time_step(cell_type) or (cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-1):
+                    #     print(f"ID: {cell_id} || [Cell type: {cell_type}]", "t:", t+1, "selecting first mask", f"[Score: {scores[0]}]")
+                    #     best_mask = masks[0] #first mask
+
+                    # #t=6
+                    # elif (cell_type != 1 and t+1 == utils.len_cell_type_time_step(cell_type)-1) or (cell_type==1 and t+1 == utils.len_cell_type_time_step(cell_type)-2):
+                    #     print(f"ID: {cell_id} || [Cell type: {cell_type}]", "t:", t+1, "selecting third mask", f"[Score: {scores[1]}]")
+                    #     best_mask = masks[1] #second mask
+                    # #t=5
+                    # elif t+1 == utils.len_cell_type_time_step(cell_type)-2 : 
+                    #     print(f"ID: {cell_id} || [Cell type: {cell_type}]", "t:", t+1, "selecting second mask", f"[Score: {scores[1]}]")
+                    #     best_mask = masks[1] #second mask
+                    # else:
+                    #     print(f"ID: {cell_id} || [Cell type: {cell_type}]", "t:", t+1, "selecting first mask", f"[Score: {scores[0]}]")
+                    #     best_mask = masks[0] #first mask
                     
                     mask_image = get_mask_image(best_mask, plt.gca(), alpha=False)
                     mask_gray = cv2.normalize(src=mask_image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)

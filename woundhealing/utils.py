@@ -11,9 +11,9 @@ CELL_TYPES = {0: MONOLAYER, 1: SPHERES}
 
 def intervals_no_hours_taken_photo(celltype=0):
     if celltype == 0: #monolayer
-        return ((24-12) // PHOTO_INTERVAL)-1
+        return len(MONOLAYER)-len(MONOLAYER)
     elif celltype == 1: #sphere
-        return ((MONOLAYER[-1] - SPHERES[-1]) // PHOTO_INTERVAL) -1
+        return len(MONOLAYER)-len(SPHERES)
 
 def len_cell_type_time_step(celltype=0):
     try:

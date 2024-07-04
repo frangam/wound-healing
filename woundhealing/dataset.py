@@ -103,18 +103,18 @@ def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_fra
                     # print("image shape", image.shape)
                     aug = augment_frames([image], 1, r=0)
                     aug = np.squeeze(aug)
-                    frame_images.append(aug)
+                    # frame_images.append(aug)
                     for i in range(int_no_photos-1): #we need 1 additional
                         aug = augment_frames([aug], 1, r=i+1)
                         aug = np.squeeze(aug)
                         frame_images.append(aug)
                 elif 'spheres' in image_type:
                     black_frame = np.zeros_like(image)
-                    if image_type == "real_spheres": #due to the segmentations we repeated the last segmentation... now we remove it
+                    # if image_type == "real_spheres": #due to the segmentations we repeated the last segmentation... now we remove it
                         # frame_images = frame_images[:-1]
-                        frame_images.append(black_frame)
+                        # frame_images.append(black_frame)
 
-                    frame_images.append(black_frame)
+                    # frame_images.append(black_frame)
                     int_no_photos = utils.intervals_no_hours_taken_photo(1)
                     for _ in range(int_no_photos+1): #we need 1 additional
                         frame_images.append(black_frame)
@@ -153,6 +153,7 @@ def split_dataset(dataset, labels, test_ratio=0.9, seed=43):
     Tuple[np.array, np.array]: The training and validation datasets.
     """
     np.random.seed(seed)
+    train_labels, val_labels = [],[]
     # indexes = np.arange(dataset.shape[0])
     # np.random.shuffle(indexes)
     # train_index = indexes[: int(train_ratio * dataset.shape[0])]
@@ -178,7 +179,7 @@ def split_dataset(dataset, labels, test_ratio=0.9, seed=43):
         train_dataset, val_dataset = train_test_split(dataset, test_size=test_ratio, random_state=seed)
 
 
-    return train_dataset, val_dataset
+    return train_dataset, val_dataset,train_labels, val_labels
 
 def normalize_data(dataset):
     """

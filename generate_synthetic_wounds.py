@@ -36,7 +36,7 @@ def main():
     IMG_WIDTH = args.w
     IMG_HEIGHT = args.h
     
-    MONOLAYER = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+    MONOLAYER = [0, 3, 6, 9, 12, 24, 27]
     SPHERES = [0, 3, 6, 9, 12, 15]
     REDUCE_HEIGHT = 5
 

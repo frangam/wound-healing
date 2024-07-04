@@ -39,38 +39,119 @@ from tensorflow.keras.models import load_model
 import woundhealing as W
 from woundhealing.model import ssim, mse, psnr, TransformerBlock, MultiHeadSelfAttention
 
-def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, num_frames_to_show=4, example_index=0, thr_whit=0, include_original=True):
+# def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, num_frames_to_show=4, example_index=0, thr_whit=0, include_original=True):
+#     """
+#     Generate and visualize predicted frames.
+
+#     Parameters:
+#     - model (keras.Model): The trained model.
+#     - val_dataset (np.array): The validation dataset.
+#     - save_path (str): The path to save the visualization.
+#     - num_frames_to_show (int): The number of frames to show in the visualization. 
+#       Defaults to 6.
+#     - example_index (int): The index of the example from the validation dataset to visualize. 
+#       Defaults to 0.
+#     """
+#     example = val_dataset[example_index, ...] 
+#     frames = example[:num_frames_initial, ...]
+#     original_frames = example[num_frames_initial:, ...]
+#     h, w = frames.shape[1], frames.shape[2]
+#     new_predictions = []
+
+#     for i in tqdm(range(num_frames_to_show), "Predicting..."):
+       
+#         print("frames to predict", frames.shape)
+#         new_prediction = model.predict(np.expand_dims(frames, axis=0))
+#         print("new_prediction", new_prediction.shape)
+#         new_prediction = np.squeeze(new_prediction, axis=0)
+#         print("new_prediction squeeze", new_prediction.shape)
+#         predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0) #take last frame predicted
+#         print("predicted_frame", predicted_frame.shape)
+#         sq_predicted_frame = np.squeeze(predicted_frame)
+#         # print(sq_predicted_frame)
+#         print("squeeze predicted_frame", sq_predicted_frame.shape)
+#         # print("squeeze, tiene pixeles que no son negros?", np.any(sq_predicted_frame != 0))
+
+#         if not include_original:
+#             frames = np.concatenate((frames, predicted_frame), axis=0)
+#         else:
+#             frames = example[: num_frames_initial + i + 1, ...]
+
+#         new_predictions.append(sq_predicted_frame)
+        
+       
+    
+#     inc = "incremental" if include_original else "sequential"
+#     orig_path = f"{save_path}{inc}/original/"
+#     pred_path = f"{save_path}{inc}/prediction/"
+#     os.makedirs(orig_path, exist_ok=True)
+#     os.makedirs(pred_path, exist_ok=True)
+#     fig, axes = plt.subplots(2, num_frames_to_show, figsize=(num_frames_to_show*2, 4))
+#     for i in range(len(new_predictions)):
+#         # Guardar el frame predicho
+#         predicted_frame = new_predictions[i]
+#         predicted_frame = predicted_frame / np.max(predicted_frame) *255  # Ajustar los valores al rango de 0 a 255
+#         predicted_frame = predicted_frame.astype(np.uint8)  # Convertir los valores a tipo de datos de 8 bits sin signo
+#         predicted_frame = Image.fromarray(predicted_frame, mode="L")
+#         image_filename = os.path.join(pred_path, f"prediction_frame_{example_index}_{i}.png")        
+#         predicted_frame.save(image_filename)
+
+#         # Guardar el frame original si está disponible
+#         if i < len(original_frames):
+#             original_frame = original_frames[i]
+#         else:
+#             original_frame = np.zeros_like(predicted_frame)  # Crear una imagen negra del mismo tamaño
+#         original_frame = original_frame / np.max(original_frame) * 255         # Ajustar los valores al rango de 0 a 255
+#         original_frame = np.squeeze(original_frame)     # Eliminar la dimensión adicional si existe
+#         original_frame = original_frame.astype(np.uint8)         # Convertir los valores a tipo de datos de 8 bits sin signo
+#         image = Image.fromarray(original_frame, mode="L") # Crear una imagen PIL
+#         image_filename = os.path.join(orig_path, f"original_frame_{example_index}_{i}.png")
+#         image.save(image_filename)
+
+#         # Visualizar los frames en la figura
+#         ax_original = axes[0, i]
+#         ax_predicted = axes[1, i]
+
+#         # Visualizar el frame original
+#         ax_original.imshow(original_frame, cmap="gray")
+#         ax_original.set_title(f"Original Frame {num_frames_initial + i + 1}")
+#         ax_original.axis("off")
+
+#         # Visualizar el frame predicho
+#         ax_predicted.imshow(predicted_frame, cmap="gray")
+#         ax_predicted.set_title(f"Predicted Frame {num_frames_initial + i + 1}")
+#         ax_predicted.axis("off")
+
+#     # Guardar la figura con todas las predicciones
+#     p = f"{save_path}{inc}/all_predictions_in_a_single_image/"
+#     os.makedirs(p, exist_ok=True)
+#     plt.savefig(f"{p}predictions_{example_index}")
+#     plt.close()
+    
+def predict_and_visualize(model, x_val, original_val, data_type, save_path, num_frames_initial=2, num_frames_to_show=4, example_index=0, thr_whit=0, include_original=True):
     """
     Generate and visualize predicted frames.
 
     Parameters:
     - model (keras.Model): The trained model.
-    - val_dataset (np.array): The validation dataset.
+    - x_val (np.array): The validation dataset with shifted frames.
+    - original_val (np.array): The original validation dataset.
     - save_path (str): The path to save the visualization.
     - num_frames_to_show (int): The number of frames to show in the visualization. 
       Defaults to 6.
     - example_index (int): The index of the example from the validation dataset to visualize. 
       Defaults to 0.
     """
-    example = val_dataset[example_index, ...] 
+    example = x_val[example_index, ...]
     frames = example[:num_frames_initial, ...]
-    original_frames = example[num_frames_initial:, ...]
-    h, w = frames.shape[1], frames.shape[2]
+    original_frames = original_val[example_index, num_frames_initial:, ...]
     new_predictions = []
 
     for i in tqdm(range(num_frames_to_show), "Predicting..."):
-       
-        print("frames to predict", frames.shape)
         new_prediction = model.predict(np.expand_dims(frames, axis=0))
-        print("new_prediction", new_prediction.shape)
         new_prediction = np.squeeze(new_prediction, axis=0)
-        print("new_prediction squeeze", new_prediction.shape)
-        predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0) #take last frame predicted
-        print("predicted_frame", predicted_frame.shape)
+        predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0)  # Take last frame predicted
         sq_predicted_frame = np.squeeze(predicted_frame)
-        # print(sq_predicted_frame)
-        print("squeeze predicted_frame", sq_predicted_frame.shape)
-        # print("squeeze, tiene pixeles que no son negros?", np.any(sq_predicted_frame != 0))
 
         if not include_original:
             frames = np.concatenate((frames, predicted_frame), axis=0)
@@ -78,57 +159,44 @@ def predict_and_visualize(model, val_dataset, save_path, num_frames_initial=2, n
             frames = example[: num_frames_initial + i + 1, ...]
 
         new_predictions.append(sq_predicted_frame)
-        
-       
-    
+
     inc = "incremental" if include_original else "sequential"
-    orig_path = f"{save_path}{inc}/original/"
-    pred_path = f"{save_path}{inc}/prediction/"
+    orig_path = f"{save_path}{inc}/{data_type}/original/"
+    pred_path = f"{save_path}{inc}/{data_type}/prediction/"
     os.makedirs(orig_path, exist_ok=True)
     os.makedirs(pred_path, exist_ok=True)
     fig, axes = plt.subplots(2, num_frames_to_show, figsize=(num_frames_to_show*2, 4))
+    
     for i in range(len(new_predictions)):
-        # Guardar el frame predicho
+        # Save predicted frame
         predicted_frame = new_predictions[i]
-        predicted_frame = predicted_frame / np.max(predicted_frame) *255  # Ajustar los valores al rango de 0 a 255
-        predicted_frame = predicted_frame.astype(np.uint8)  # Convertir los valores a tipo de datos de 8 bits sin signo
+        predicted_frame = (predicted_frame / np.max(predicted_frame) * 255).astype(np.uint8)
         predicted_frame = Image.fromarray(predicted_frame, mode="L")
-        image_filename = os.path.join(pred_path, f"prediction_frame_{example_index}_{i}.png")        
-        predicted_frame.save(image_filename)
+        predicted_frame.save(os.path.join(pred_path, f"prediction_frame_{example_index}_{i}.png"))
 
-        # Guardar el frame original si está disponible
+        # Save original frame if available
         if i < len(original_frames):
             original_frame = original_frames[i]
         else:
-            original_frame = np.zeros_like(predicted_frame)  # Crear una imagen negra del mismo tamaño
-        original_frame = original_frame / np.max(original_frame) * 255         # Ajustar los valores al rango de 0 a 255
-        original_frame = np.squeeze(original_frame)     # Eliminar la dimensión adicional si existe
-        original_frame = original_frame.astype(np.uint8)         # Convertir los valores a tipo de datos de 8 bits sin signo
-        image = Image.fromarray(original_frame, mode="L") # Crear una imagen PIL
-        image_filename = os.path.join(orig_path, f"original_frame_{example_index}_{i}.png")
-        image.save(image_filename)
+            original_frame = np.zeros_like(predicted_frame)
+        original_frame = (original_frame / np.max(original_frame) * 255).astype(np.uint8)
+        original_frame = np.squeeze(original_frame)  # Ensure 2D
+        original_frame = Image.fromarray(original_frame, mode="L")
+        original_frame.save(os.path.join(orig_path, f"original_frame_{example_index}_{i}.png"))
 
-        # Visualizar los frames en la figura
-        ax_original = axes[0, i]
-        ax_predicted = axes[1, i]
+        # Visualize frames
+        axes[0, i].imshow(original_frame, cmap="gray")
+        axes[0, i].set_title(f"Original Frame {num_frames_initial + i + 1}")
+        axes[0, i].axis("off")
 
-        # Visualizar el frame original
-        ax_original.imshow(original_frame, cmap="gray")
-        ax_original.set_title(f"Original Frame {num_frames_initial + i + 1}")
-        ax_original.axis("off")
+        axes[1, i].imshow(predicted_frame, cmap="gray")
+        axes[1, i].set_title(f"Predicted Frame {num_frames_initial + i + 1}")
+        axes[1, i].axis("off")
 
-        # Visualizar el frame predicho
-        ax_predicted.imshow(predicted_frame, cmap="gray")
-        ax_predicted.set_title(f"Predicted Frame {num_frames_initial + i + 1}")
-        ax_predicted.axis("off")
-
-    # Guardar la figura con todas las predicciones
-    p = f"{save_path}{inc}/all_predictions_in_a_single_image/"
-    os.makedirs(p, exist_ok=True)
-    plt.savefig(f"{p}predictions_{example_index}")
+    # Save the figure with all predictions
+    os.makedirs(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/", exist_ok=True)
+    plt.savefig(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/predictions_{example_index}.png")
     plt.close()
-    
-    
 
 def save_gif(frames, filename, duration=100):
     imageio.mimsave(filename, frames, "GIF", duration=duration)
@@ -273,7 +341,7 @@ def main():
     p.add_argument('--fine-tune-model', type=str, default="best_model.h5", help='path to the best model for fine-tuning')
     p.add_argument('-m', '--m', type=int, default=0, help="The model architecture. 0: ConvLSTM, 1: Bi-directional ConvLSTM and U-Net")
     p.add_argument('--layers', type=int, default=5, help="The number of hidden layers")
-    p.add_argument('--ts', type=float, default=.3, help='the test split percentage')
+    p.add_argument('--ts', type=float, default=.2, help='the test split percentage')
     p.add_argument('-bz', '--bz', type=int, default=32, help='the GPU batch size')
     p.add_argument('-e', '--epochs', type=int, default=50, help='the deep learning epochs')
     p.add_argument('-pa', '--patience', type=int, default=10, help='the patience hyperparameter')
@@ -298,15 +366,15 @@ def main():
   
     # dataset = W.dataset.load_images(base_dir="data/", image_type=args.type, remove_first_frame=args.type=="synth_monolayer" or args.type=="real_monolayer", resize_width=args.w, resize_height=args.h)
     if "synthetic" in args.prefix:
-        dataset = W.dataset.load_images(base_dir="data/", image_type="synth_monolayer_old", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=False)
-        dataset2 = W.dataset.load_images(base_dir="data/", image_type="synth_spheres_old", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=False)
+        dataset = W.dataset.load_images(base_dir="data/", image_type="synth_monolayer_old", remove_first_frame=True, resize_width=args.w, resize_height=args.h, fill=False)
+        dataset2 = W.dataset.load_images(base_dir="data/", image_type="synth_spheres_old", remove_first_frame=True, resize_width=args.w, resize_height=args.h, fill=True)
         # dataset3 = W.dataset.load_images(base_dir="data/", image_type="aug_synth_monolayer", remove_first_frame=False, resize_width=args.w, resize_height=args.h)
         # dataset4 = W.dataset.load_images(base_dir="data/", image_type="aug_synth_spheres", remove_first_frame=False, resize_width=args.w, resize_height=args.h)
         # dataset = np.concatenate((dataset, dataset3), axis=0)
         # dataset2 = np.concatenate((dataset2, dataset4), axis=0)
     else:
         dataset = W.dataset.load_images(base_dir="data/", image_type="real_monolayer", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=False)
-        dataset2 = W.dataset.load_images(base_dir="data/", image_type="real_spheres", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=False)
+        dataset2 = W.dataset.load_images(base_dir="data/", image_type="real_spheres", remove_first_frame=False, resize_width=args.w, resize_height=args.h, fill=True)
 
     if args.save_real_loaded:
         W.utils.save_image_dataset_loaded(dataset, "real_monolayer")
@@ -337,22 +405,28 @@ def main():
     print(dataset.shape)
 
     # Split the dataset
-    train_dataset, val_dataset = W.dataset.split_dataset(dataset, labels, args.ts, seed=33)
+    train_dataset, val_dataset, train_labels, val_labels = W.dataset.split_dataset(dataset, labels, args.ts, seed=33)
+    train_dataset, test_dataset, train_labels, test_labels = W.dataset.split_dataset(train_dataset, train_labels, args.ts, seed=33)
 
     # Normalize the data
     train_dataset = W.dataset.normalize_data(train_dataset)
     val_dataset = W.dataset.normalize_data(val_dataset)
+    test_dataset = W.dataset.normalize_data(test_dataset)
+
     train_dataset = train_dataset[..., :1] #to gray
     val_dataset = val_dataset[..., :1] #to gray
+    test_dataset = test_dataset[..., :1] #to gray
 
     # Create shifted frames
     x_train, y_train = W.dataset.create_shifted_frames(train_dataset)
     x_val, y_val = W.dataset.create_shifted_frames(val_dataset)
-    
+    x_test, y_test = W.dataset.create_shifted_frames(val_dataset)
+
 
     # Inspect the dataset
     print("Training Dataset Shapes: " + str(x_train.shape) + ", " + str(y_train.shape))
     print("Validation Dataset Shapes: " + str(x_val.shape) + ", " + str(y_val.shape))
+    print("Test Dataset Shapes: " + str(x_test.shape) + ", " + str(y_test.shape))
 
     # Visualize and save an example
     example_index = np.random.choice(range(len(train_dataset)))
@@ -426,16 +500,16 @@ def main():
         history_dict = history.history
         plt.style.use("ggplot")
         plt.figure()
-        N = len(history_dict["loss"])
-        plt.plot(np.arange(0, N), history_dict["loss"], label="training_loss")
-        plt.plot(np.arange(0, N), history_dict["val_loss"], label="val_loss")
-        # plt.plot(np.arange(0, N), history_dict["accuracy"], label="training_acc")
-        # plt.plot(np.arange(0, N), history_dict["val_accuracy"], label="val_acc")
-        plt.title("Performance Metrics of Valence Emotion State")
+        N = len(history_dict["ssim"])
+        plt.plot(np.arange(0, N), history_dict["ssim"], label="ssim")
+        plt.plot(np.arange(0, N), history_dict["val_ssim"], label="val_ssim")
+        plt.plot(np.arange(0, N), history_dict["mse"], label="mse")
+        plt.plot(np.arange(0, N), history_dict["val_mse"], label="val_mse")
+        plt.title("Training and Validation SSIM and MSE")
         plt.xlabel("Epoch #")
-        plt.ylabel("Loss/Accuracy")
+        plt.ylabel("SSIM/MSE")
         plt.legend(loc="best", bbox_to_anchor=(0.5, 0., 0.5, 0.5))
-        plt.savefig(f"{results_dir}/{args.prefix}_loss_plot.png", dpi=300)
+        plt.savefig(f"{results_dir}/{args.prefix}_ssim_mse_history_plot.png", dpi=300)
 
 
         ##################################################################
@@ -449,10 +523,17 @@ def main():
     # total_frames_to_predict = (val_dataset.shape[1]//2 )
     print("total images",args.frames_pred)
 
+    # Generating predictions
     for i in range(len(x_val)):
-        predict_and_visualize(best_model, val_dataset, results_dir,num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, thr_whit=args.th_white, include_original=True)
-        predict_and_visualize(best_model, val_dataset, results_dir,num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, thr_whit=args.th_white, include_original=False)
+        print("generating validation predictions")
+        predict_and_visualize(best_model, x_val, val_dataset, "validation", results_dir, num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, include_original=True)
+        predict_and_visualize(best_model, x_val, val_dataset, "validation", results_dir, num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, include_original=False)
 
+    for i in range(len(x_test)):
+        print("generating test predictions")
+        predict_and_visualize(best_model, x_test, test_dataset, "test", results_dir, num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, include_original=True)
+        predict_and_visualize(best_model, x_test, test_dataset, "test", results_dir, num_frames_initial=args.start_frame, num_frames_to_show=args.frames_pred, example_index=i, include_original=False)
+    
     # create_gifs(best_model, x_val, results_dir, last_frames_number=x_val.shape[1]//2)
     
     # final_results_video = f"{results_dir}video/"
