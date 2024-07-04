@@ -1,11 +1,11 @@
-# Predicting Wound Progress Framework (PWPF)
+# Using Deep Learning for Predicting the Dynamic Evolution of Breast Cancer Migration (Wound Healing Assays Prediction)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8130984.svg)](https://doi.org/10.5281/zenodo.8130984)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) <img src="https://img.shields.io/github/release/frangam/wound-healing.svg"/> [![GitHub all releases](https://img.shields.io/github/downloads/frangam/wound-healing/total)](https://github.com/frangam/wound-healing/releases/download/1.0/wound-healing-v1.0.zip)
 
-Software for Predicting the Dynamic Evolution of Tumor Migration with Artificial Intelligence.
+Software for Predicting the Dynamic Evolution of Tumor Migration with Artificial Intelligence in Wound Healing Assays.
 
-[[`Paper`]Coming Soon] [[`Dataset`](https://doi.org/10.5281/zenodo.8131123)] [[`BibTeX`](#citing-pwpf)]
+[[`Paper`]Coming Soon] [[`Dataset`](https://doi.org/10.5281/zenodo.8131123)] [[`BibTeX`](#citation)]
 
 ## Model architectures
 <p float="left">
@@ -20,13 +20,6 @@ Support us downloading our last release
 
 - Click on this button to download [![GitHub all releases](https://img.shields.io/github/downloads/frangam/wound-healing/total)](https://github.com/frangam/wound-healing/releases/download/1.0/wound-healing-v1.0.zip)
 - We also appreciate your support downloading it on ZENODO site: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8130984.svg)](https://doi.org/10.5281/zenodo.8130984)
-
-
-## Citation
-Please, cite our work:
-
-- [Garcia-Moreno, F.M.](https://frangam.com/); Ruiz-Espigares, J., Gutierrez-Naranjo, M.A. "Predicting Wound Progress Framework (PWPF)", 2023.
-
 
 
 ## Installation
@@ -86,20 +79,16 @@ predictions = quantifying_model.predict([X_test, images_test])
 We use a combination of [Meta's Segment Anything model](https://github.com/facebookresearch/segment-anything) and [MedSAM model]()
 
 
-## Citing PWPF
+## <a name="Citation"></a>Citation
 
-The Predicting Wound Progress Framework (PWPF) is a registered intellectual property in Andalusia, Spain (reference: XXX). Despite its proprietary status, it can be freely used for research purposes, given that proper citation is provided.
-
-If you use PWPF in your research, please use the following BibTeX entry:
+If you use our code in your research, please use the following BibTeX entry:
 
 ```
 @misc{Garcia-Moreno-PWPF,
-  title={Predicting Wound Progress Framework (PWPF)},
-  author={Garcia-Moreno, Francisco Manuel and Ruiz-Espigares, Jesus and Gutierrez-Naranjo, Miguel Angel},
-  year={2023},
-  doi={10.5281/zenodo.8130984},
-  url={https://github.com/frangam/wound-healing},
-  note = {version 1.0}
+  title={Using Deep Learning for Predicting the Dynamic Evolution of Breast Cancer Migration,
+  author={Garcia-Moreno, Francisco Manuel and Ruiz-Espigares, Jesus and Marchal, Juan Antonio and Gutierrez-Naranjo, Miguel Angel},
+  year={2024},
+  doi={}
 }
 ```
 
