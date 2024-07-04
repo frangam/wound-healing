@@ -265,15 +265,17 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
         frames = np.concatenate((frames, predicted_frame), axis=0)[1:]  # Add predicted frame and remove first frame
         predictions.append(np.squeeze(predicted_frame))
 
+        # Calcular el timestep
+        timestep = current_timestep + i + 1
+        
         # Guardar el frame original
-        timestep = current_timestep + i
         original_frame = y_val[sequence_indices[current_timestep + i - 1]]
         original_frame = (original_frame / np.max(original_frame) * 255).astype(np.uint8)
         original_frame = np.squeeze(original_frame)  # Ensure 2D
         if original_frame.ndim == 3:
             original_frame = original_frame[:, :, 0]
         original_image = Image.fromarray(original_frame, mode="L")
-        original_image.save(os.path.join(orig_path, f"original_frame_{timestep}_{example_index}_{i}.png"))
+        original_image.save(os.path.join(orig_path, f"original_frame_{example_index}_{i}_{timestep}.png"))
 
         # Guardar el frame predicho
         predicted_frame = np.squeeze(predicted_frame)  # Ensure 2D
@@ -281,7 +283,7 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
         if predicted_frame.ndim == 3:
             predicted_frame = predicted_frame[:, :, 0]
         predicted_image = Image.fromarray(predicted_frame, mode="L")
-        predicted_image.save(os.path.join(pred_path, f"prediction_frame_{timestep}_{example_index}_{i}.png"))
+        predicted_image.save(os.path.join(pred_path, f"prediction_frame_{example_index}_{i}_{timestep}.png"))
 
         # Visualizar frame original y predicho
         axes[0, current_timestep + i].imshow(original_frame, cmap="gray")
@@ -291,6 +293,11 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
         axes[1, current_timestep + i].imshow(predicted_frame, cmap="gray")
         axes[1, current_timestep + i].set_title(f"Predicted Frame {timestep}")
         axes[1, current_timestep + i].axis("off")
+
+    # Ocultar los ejes de los frames vacíos si hay alguno
+    for j in range(current_timestep + num_predictions_needed, num_frames_to_show):
+        axes[0, j].axis("off")
+        axes[1, j].axis("off")
 
     # Guardar la figura con todas las predicciones
     os.makedirs(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/", exist_ok=True)
