@@ -85,13 +85,13 @@ def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_fra
         frame_files.sort(key=lambda x: int(x.split('.')[0].split('_')[1])) # Sort frame files in order
         
         if remove_first_frame and image_type in remove_types:
-            print("Removing first frame for ",image_type)
+            # print("Removing first frame for ",image_type)
             frame_files = frame_files[1:] # Remove the first frame if the condition is met
-        else:
-            print("NOT Removing first frame for ",image_type)
+        # else:
+            # print("NOT Removing first frame for ",image_type)
 
         len_f = len(frame_files)
-        print("Total frames:", len_f, frame_files)
+        # print("Total frames:", len_f, frame_files)
         for t, file in enumerate(tqdm(frame_files, desc='Loading images', leave=False)):
 
             image = cv2.imread(os.path.join(frame_path, file))
@@ -117,7 +117,7 @@ def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_fra
                         aug = np.squeeze(aug)
                         frame_images.append(aug)
                 elif 'spheres' in image_type:
-                    print("rellenando spheres")
+                    # print("rellenando spheres")
                     black_frame = np.zeros_like(image)
                     # if image_type == "real_spheres": #due to the segmentations we repeated the last segmentation... now we remove it
                         # frame_images = frame_images[:-1]
@@ -215,6 +215,7 @@ def split_dataset(sequences, next_frames, labels, ids, train_ratio=0.6, val_rati
 
     # Obtener los IDs únicos
     unique_ids = np.unique(ids)
+    print("unique_ids",unique_ids)
     unique_labels = np.array([labels[ids == uid][0] for uid in unique_ids])
 
     # Dividir los IDs únicos en conjuntos de entrenamiento y restante
@@ -289,24 +290,25 @@ def normalize_data(dataset):
 #     y = data[:, 1 : data.shape[1], :, :]
 #     return x, y
 
-import numpy as np
-
-def create_shifted_frames(data):
+def create_shifted_frames(data, labels):
     """
     Create shifted frames for model training.
 
     Parameters:
     data (np.array): The dataset used to create shifted frames.
                      The shape of the data should be (num_sequences, sequence_length, height, width, channels).
+    labels (np.array): The labels corresponding to each sequence in the dataset.
+                       The shape of the labels should be (num_sequences,).
 
     Returns:
-    Tuple[np.array, np.array, np.array]: The input data (x), the target shifted frames (y),
-                                         and an array of sequence IDs.
+    Tuple[np.array, np.array, np.array, np.array]: The input data (x), the target shifted frames (y),
+                                                   the sequence IDs (ids), and the labels for each shifted frame.
     """
     num_sequences, sequence_length, height, width, channels = data.shape
     x = []
     y = []
     ids = []
+    new_labels = []
     for seq_id in range(num_sequences):
         for i in range(1, sequence_length):
             seq_x = np.zeros((sequence_length - 1, height, width, channels))
@@ -314,10 +316,12 @@ def create_shifted_frames(data):
             x.append(seq_x)
             y.append(data[seq_id, i:i+1, :, :, :])
             ids.append(seq_id)
+            new_labels.append(labels[seq_id])
     x = np.array(x)
     y = np.array(y)
     ids = np.array(ids)
-    return x, y, ids
+    new_labels = np.array(new_labels)
+    return x, y, ids, new_labels
 
 
 def visualize_example(data, example_index, save_path):

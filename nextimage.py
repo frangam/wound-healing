@@ -506,10 +506,23 @@ def main():
 
     dataset = W.dataset.normalize_data(dataset)# Normalize the data
     dataset = dataset[..., :1] #to gray
-    x, y, seq_ids = W.dataset.create_shifted_frames(dataset) # Split the dataset
+    x, y, seq_ids,labels = W.dataset.create_shifted_frames(dataset,labels) # Split the dataset
     print("Shifted dataset X:", x.shape, " y:", y.shape)
     x_train, x_val, x_test, y_train, y_val, y_test, train_labels, val_labels, test_labels, train_ids, val_ids, test_ids = W.dataset.split_dataset(x, y, labels, seq_ids, val_ratio=args.ts, test_ratio=args.ts)
 
+    # Imprimir los IDs únicos
+    unique_train_ids = np.unique(train_ids)
+    unique_val_ids = np.unique(val_ids)
+    unique_test_ids = np.unique(test_ids)
+
+    print("IDs únicos en el conjunto de entrenamiento:", unique_train_ids)
+    print("IDs únicos en el conjunto de validación:", unique_val_ids)
+    print("IDs únicos en el conjunto de prueba:", unique_test_ids)
+
+    # Verificar solapamiento
+    print("Solapamiento entre entrenamiento y validación:", np.intersect1d(unique_train_ids, unique_val_ids))
+    print("Solapamiento entre entrenamiento y prueba:", np.intersect1d(unique_train_ids, unique_test_ids))
+    print("Solapamiento entre validación y prueba:", np.intersect1d(unique_val_ids, unique_test_ids))
 
     # # Split the dataset
     # train_dataset, val_dataset, train_labels, val_labels = W.dataset.split_dataset(dataset, labels, args.ts, seed=33)
