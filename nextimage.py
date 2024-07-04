@@ -415,23 +415,29 @@ def main():
 
     print(dataset.shape)
 
-    # Split the dataset
-    train_dataset, val_dataset, train_labels, val_labels = W.dataset.split_dataset(dataset, labels, args.ts, seed=33)
-    train_dataset, test_dataset, train_labels, test_labels = W.dataset.split_dataset(train_dataset, train_labels, args.ts, seed=33)
+    dataset = W.dataset.normalize_data(dataset)# Normalize the data
+    dataset = dataset[..., :1] #to gray
+    x, y, seq_ids = W.dataset.create_shifted_frames(dataset) # Split the dataset
+    x_train, x_val, x_test, y_train, y_val, y_test, train_labels, val_labels, test_labels = W.dataset.split_dataset(x, y, labels, seq_ids)
 
-    # Normalize the data
-    train_dataset = W.dataset.normalize_data(train_dataset)
-    val_dataset = W.dataset.normalize_data(val_dataset)
-    test_dataset = W.dataset.normalize_data(test_dataset)
 
-    train_dataset = train_dataset[..., :1] #to gray
-    val_dataset = val_dataset[..., :1] #to gray
-    test_dataset = test_dataset[..., :1] #to gray
+    # # Split the dataset
+    # train_dataset, val_dataset, train_labels, val_labels = W.dataset.split_dataset(dataset, labels, args.ts, seed=33)
+    # train_dataset, test_dataset, train_labels, test_labels = W.dataset.split_dataset(train_dataset, train_labels, args.ts, seed=33)
 
-    # Create shifted frames
-    x_train, y_train = W.dataset.create_shifted_frames(train_dataset)
-    x_val, y_val = W.dataset.create_shifted_frames(val_dataset)
-    x_test, y_test = W.dataset.create_shifted_frames(val_dataset)
+    # # Normalize the data
+    # train_dataset = W.dataset.normalize_data(train_dataset)
+    # val_dataset = W.dataset.normalize_data(val_dataset)
+    # test_dataset = W.dataset.normalize_data(test_dataset)
+
+    # train_dataset = train_dataset[..., :1] #to gray
+    # val_dataset = val_dataset[..., :1] #to gray
+    # test_dataset = test_dataset[..., :1] #to gray
+
+    # # Create shifted frames
+    # x_train, y_train = W.dataset.create_shifted_frames(train_dataset)
+    # x_val, y_val = W.dataset.create_shifted_frames(val_dataset)
+    # x_test, y_test = W.dataset.create_shifted_frames(val_dataset)
 
 
     # Inspect the dataset
@@ -440,10 +446,10 @@ def main():
     print("Test Dataset Shapes: " + str(x_test.shape) + ", " + str(y_test.shape))
 
     # Visualize and save an example
-    example_index = np.random.choice(range(len(train_dataset)))
+    example_index = np.random.choice(range(len(dataset)))
     os.makedirs(f'{results_dir}examples/', exist_ok=True)
-    W.dataset.visualize_example(train_dataset, example_index, f'{results_dir}examples/example_{example_index}.png')
-    W.dataset.frames_to_video(train_dataset, example_index, f'{results_dir}examples/example_{example_index}.mp4')
+    W.dataset.visualize_example(dataset, example_index, f'{results_dir}examples/example_{example_index}.png')
+    W.dataset.frames_to_video(dataset, example_index, f'{results_dir}examples/example_{example_index}.mp4')
 
     print("input shape:", x_train.shape)
     # model = W.model.create_model(x_train.shape[2:], architecture=0, num_layers=10)
