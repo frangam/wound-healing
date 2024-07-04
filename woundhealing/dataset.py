@@ -194,19 +194,69 @@ def normalize_data(dataset):
     print(dataset.shape)
     return dataset / 255
 
+# def create_shifted_frames(data):
+#     """
+#     Create shifted frames for model training.
+
+#     Parameters:
+#     data (np.array): The dataset used to create shifted frames.
+
+#     Returns:
+#     Tuple[np.array, np.array]: The input data and the shifted frames.
+#     """
+#     x = data[:, 0 : data.shape[1] - 1, :, :]
+#     y = data[:, 1 : data.shape[1], :, :]
+#     return x, y
+
+import numpy as np
+
 def create_shifted_frames(data):
     """
     Create shifted frames for model training.
 
+    This function takes a dataset of sequences and generates multiple input-output pairs 
+    for training a model to predict the next frame in a sequence. For each sequence in the 
+    dataset, it creates several training examples by shifting the frames, allowing the model 
+    to learn to predict each frame from the previous frames.
+
     Parameters:
-    data (np.array): The dataset used to create shifted frames.
+    data (np.array): The dataset used to create shifted frames. 
+                     The shape of the data should be (num_sequences, sequence_length, height, width, channels).
 
     Returns:
-    Tuple[np.array, np.array]: The input data and the shifted frames.
+    Tuple[np.array, np.array]: The input data (x) and the target shifted frames (y).
+                               The shape of x will be (num_examples, sequence_length, height, width, channels),
+                               and the shape of y will be (num_examples, 1, height, width, channels).
+
+    Example:
+    If the input data has sequences of 8 frames, this function will generate the following pairs:
+
+    Original Sequence:
+    Sequence 1: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6, Frame7, Frame8]
+
+    Generated Pairs:
+    x: [Frame1, 0, 0, 0, 0, 0, 0, 0]                 -> y: [Frame2]
+    x: [Frame1, Frame2, 0, 0, 0, 0, 0, 0]           -> y: [Frame3]
+    x: [Frame1, Frame2, Frame3, 0, 0, 0, 0, 0]      -> y: [Frame4]
+    x: [Frame1, Frame2, Frame3, Frame4, 0, 0, 0, 0] -> y: [Frame5]
+    x: [Frame1, Frame2, Frame3, Frame4, Frame5, 0, 0, 0] -> y: [Frame6]
+    x: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6, 0, 0] -> y: [Frame7]
+    x: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6, Frame7, 0] -> y: [Frame8]
+
+    This allows the model to learn to predict the next frame given any number of previous frames in the sequence.
     """
-    x = data[:, 0 : data.shape[1] - 1, :, :]
-    y = data[:, 1 : data.shape[1], :, :]
+    num_sequences, sequence_length, height, width, channels = data.shape
+    x = []
+    y = []
+    for i in range(1, sequence_length):  # Start from 1 to avoid zero-length sequences
+        seq_x = np.zeros((num_sequences, sequence_length, height, width, channels))
+        seq_x[:, :i, :, :, :] = data[:, :i, :, :, :]
+        x.append(seq_x)
+        y.append(data[:, i:i+1, :, :, :])
+    x = np.concatenate(x, axis=0)
+    y = np.concatenate(y, axis=0)
     return x, y
+
 
 def visualize_example(data, example_index, save_path):
     """
