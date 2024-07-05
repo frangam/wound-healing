@@ -228,9 +228,12 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
     sequence_id = ids_val[example_index]
     # Obtener los índices de la secuencia completa con el mismo ID
     sequence_indices = np.where(ids_val == sequence_id)[0]
+    print("sequence_indices", len(sequence_indices))
     # Calcular el timestep actual basado en la posición del example_index
     current_timestep = np.where(sequence_indices == example_index)[0][0] + 1
-    num_predictions_needed = 1 if include_original else len(sequence_indices) - current_timestep
+    print("current_timestep", current_timestep)
+    num_predictions_needed = 1 if include_original else len(sequence_indices) - current_timestep + 1
+    print(f"[include original? {include_original}]num_predictions_needed: {num_predictions_needed}")
 
     predictions = []
 
@@ -295,14 +298,14 @@ def predict_and_visualize(model, x_val, y_val, ids_val, data_type, save_path, ex
         axes[1, current_timestep + i].axis("off")
 
     # Ocultar los ejes de los frames vacíos si hay alguno
-    for j in range(current_timestep + num_predictions_needed, num_frames_to_show):
+    for j in range(current_timestep):
         axes[0, j].axis("off")
         axes[1, j].axis("off")
 
     # Guardar la figura con todas las predicciones
     os.makedirs(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/", exist_ok=True)
     plt.tight_layout()
-    plt.savefig(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/predictions_{example_index}.png", bbox_inches='tight', pad_inches=0)
+    plt.savefig(f"{save_path}{inc}/{data_type}/all_predictions_in_a_single_image/predictions_{example_index}_ts_{current_timestep+1}.png", bbox_inches='tight', pad_inches=0)
     plt.close()
 
 
@@ -450,7 +453,7 @@ def main():
     p.add_argument('--fine-tune-model', type=str, default="best_model.h5", help='path to the best model for fine-tuning')
     p.add_argument('-m', '--m', type=int, default=0, help="The model architecture. 0: ConvLSTM, 1: Bi-directional ConvLSTM and U-Net")
     p.add_argument('--layers', type=int, default=5, help="The number of hidden layers")
-    p.add_argument('--ts', type=float, default=.2, help='the test split percentage')
+    p.add_argument('--ts', type=float, default=.15, help='the test split percentage')
     p.add_argument('-bz', '--bz', type=int, default=32, help='the GPU batch size')
     p.add_argument('-e', '--epochs', type=int, default=50, help='the deep learning epochs')
     p.add_argument('-pa', '--patience', type=int, default=10, help='the patience hyperparameter')
@@ -653,13 +656,13 @@ def main():
     print("total images",args.frames_pred)
 
 
-    # # Generating predictions
-    # for i in range(len(x_val)):
-    #     print("generating validation predictions, id:", i)
-    #     predict_and_visualize(best_model, x_val, y_val, val_ids, "validation", results_dir, example_index=i, include_original=True)
-    #     predict_and_visualize(best_model, x_val, y_val, val_ids, "validation", results_dir, example_index=i, include_original=False)
+    # Generating predictions
+    for i in range(len(x_val)):
+        print("generating validation predictions, id:", i)
+        predict_and_visualize(best_model, x_val, y_val, val_ids, "validation", results_dir, example_index=i, include_original=True)
+        predict_and_visualize(best_model, x_val, y_val, val_ids, "validation", results_dir, example_index=i, include_original=False)
 
-    for i in range(len(x_test)-10, len(x_test)):
+    for i in range(len(x_test)):
         print("generating test predictions, id:", i)
         predict_and_visualize(best_model, x_test, y_test, test_ids, "test", results_dir, example_index=i, include_original=True)
         predict_and_visualize(best_model, x_test, y_test, test_ids, "test", results_dir, example_index=i, include_original=False)

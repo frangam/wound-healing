@@ -250,8 +250,9 @@ def calculate_metrics(image_dir="results/next-image/synthetic/original/", target
         print("")  # Añade una línea en blanco para separar los resultados por time-step
 
     print("\nmean_ssim", np.round(global_ssim, 3))
-    print("mean_IoU", np.round(global_iou, 3))
     print("mean_mse", np.round(global_mse, 3))
+    print("mean_IoU", np.round(global_iou, 3))
+
     # print("mean_pl", mean_pl)
     # print("fid", fid)
 

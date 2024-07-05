@@ -190,7 +190,7 @@ def load_images(base_dir='data/', image_type='synth_monolayer', remove_first_fra
 
 #     return train_dataset, val_dataset,train_labels, val_labels
 
-def split_dataset(sequences, next_frames, labels, ids, train_ratio=0.6, val_ratio=0.2, test_ratio=0.2, seed=43):
+def split_dataset(sequences, next_frames, labels, ids, val_ratio=0.2, test_ratio=0.2, seed=43):
     """
     Split dataset into training, validation, and test sets, ensuring sequences are grouped by ID.
 
@@ -199,7 +199,6 @@ def split_dataset(sequences, next_frames, labels, ids, train_ratio=0.6, val_rati
     next_frames (np.array): The corresponding next frames to be split.
     labels (np.array): The labels corresponding to the dataset.
     ids (np.array): The IDs corresponding to each sequence in the dataset.
-    train_ratio (float): The ratio of the dataset to be used for training. Defaults to 0.6.
     val_ratio (float): The ratio of the dataset to be used for validation. Defaults to 0.2.
     test_ratio (float): The ratio of the dataset to be used for testing. Defaults to 0.2.
     seed (int): The random seed for reproducibility.
@@ -211,23 +210,23 @@ def split_dataset(sequences, next_frames, labels, ids, train_ratio=0.6, val_rati
     np.random.seed(seed)
 
     # Validar las proporciones
+    train_ratio = 1.0 - val_ratio - test_ratio
     assert train_ratio + val_ratio + test_ratio == 1.0, "The sum of train_ratio, val_ratio, and test_ratio must be 1."
 
     # Obtener los IDs únicos
     unique_ids = np.unique(ids)
-    print("unique_ids",unique_ids)
     unique_labels = np.array([labels[ids == uid][0] for uid in unique_ids])
 
-    # Dividir los IDs únicos en conjuntos de entrenamiento y restante
-    train_ids, remaining_ids = train_test_split(unique_ids, test_size=(val_ratio + test_ratio), random_state=seed, stratify=unique_labels)
+    # Dividir los IDs únicos en conjuntos de entrenamiento y restante (validación + prueba)
+    train_ids, remaining_ids, train_labels, remaining_labels = train_test_split(
+        unique_ids, unique_labels, test_size=(val_ratio + test_ratio), random_state=seed, stratify=unique_labels)
 
     # Calcular la proporción de validación y prueba en el conjunto restante
-    remaining_ratio = val_ratio + test_ratio
-    val_ratio_adjusted = val_ratio / remaining_ratio
+    val_ratio_adjusted = val_ratio / (val_ratio + test_ratio)
 
     # Dividir los IDs restantes en conjuntos de validación y prueba
-    remaining_labels = unique_labels[np.isin(unique_ids, remaining_ids)]
-    val_ids, test_ids = train_test_split(remaining_ids, test_size=test_ratio / remaining_ratio, random_state=seed, stratify=remaining_labels)
+    val_ids, test_ids, val_labels, test_labels = train_test_split(
+        remaining_ids, remaining_labels, test_size=(1 - val_ratio_adjusted), random_state=seed, stratify=remaining_labels)
 
     # Crear máscaras para seleccionar los datos correspondientes a los IDs de cada conjunto
     train_mask = np.isin(ids, train_ids)
@@ -261,7 +260,6 @@ def split_dataset(sequences, next_frames, labels, ids, train_ratio=0.6, val_rati
     print(np.bincount(test_labels) / len(test_labels))
 
     return train_sequences, val_sequences, test_sequences, train_next_frames, val_next_frames, test_next_frames, train_labels, val_labels, test_labels, train_ids, val_ids, test_ids
-
 
 def normalize_data(dataset):
     """
