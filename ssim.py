@@ -155,8 +155,6 @@ def calculate_metrics(image_dir="results/next-image/synthetic/original/", target
             print(np.unique(target))   
 
 
-
-
             # Normalize the images to a range of 0 to 1
             image = image / 255.0
             # image = (image - image.min()) / (image.max() - image.min())

@@ -10,20 +10,24 @@ https://github.com/frangam/wound-healing
 Please see LICENSE.md for the full license document:
 https://github.com/frangam/wound-healing/LICENSE.md
 """
-
+import os
 import numpy as np
 import tensorflow as tf
-
 from tensorflow import keras
 
 from tensorflow.keras.layers import ConvLSTM2D, GRU, BatchNormalization, Conv3D, Input, Reshape, UpSampling2D, Concatenate, MaxPooling2D, Conv2D, TimeDistributed, Lambda, MaxPooling3D, Add, LSTM, Conv2DTranspose, Flatten, Dense, RepeatVector
 from tensorflow.keras.models import Model
 from tensorflow.keras import layers
 from keras.activations import softmax
+from PIL import Image
+
 
 from skimage.metrics import structural_similarity as ssim
 
 import keras.backend as K
+
+# Creación de un ID de imagen único
+global_img_id=0
 
 def scale_weights(output, scale):
     return output * K.constant(scale)
@@ -36,7 +40,68 @@ def psnr(y_true, y_pred):
     return 10.0 / tf.math.log(10.0) * (tf.math.log(max_pixel ** 2 / K.mean(K.square(y_pred - y_true), axis=-1)))
 
 def ssim(y_true, y_pred):
+    # Imprimir las formas de y_true y y_pred
+    # tf.print("Shape of y_true:", tf.shape(y_true))
+    # tf.print("Shape of y_pred:", tf.shape(y_pred))
+
+    y_true, y_pred = tf.numpy_function(black_white, [y_true, y_pred], [tf.float32, tf.float32])
     return tf.image.ssim(y_true, y_pred, max_val=1.0)
+
+def save_images(y_true, y_pred_normalized, y_pred_threshold, img_id):
+    os.makedirs('results/ssim_checkpoints', exist_ok=True)
+    
+    num_batches = y_true.shape[0]
+    img_height = y_true.shape[2]
+    img_width = y_true.shape[3]
+    spacing = 10  # Espacio de 10 píxeles entre las imágenes
+
+    combined_width = img_width * 3 + spacing * 2
+    combined_height = img_height * num_batches + spacing * (num_batches - 1)
+    
+    combined_img = Image.new('L', (combined_width, combined_height), color=255)
+    
+    for i in range(num_batches):
+        y_true_img = Image.fromarray((np.squeeze(y_true[i, 0, :, :, 0]) * 255).astype(np.uint8), mode='L')
+        y_pred_normalized_img = Image.fromarray((np.squeeze(y_pred_normalized[i, 0, :, :, 0]) * 255).astype(np.uint8), mode='L')
+        y_pred_threshold_img = Image.fromarray((np.squeeze(y_pred_threshold[i, 0, :, :, 0]) * 255).astype(np.uint8), mode='L')
+
+        y_offset = i * (img_height + spacing)
+        combined_img.paste(y_true_img, (0, y_offset))
+        combined_img.paste(y_pred_normalized_img, (img_width + spacing, y_offset))
+        combined_img.paste(y_pred_threshold_img, ((img_width + spacing) * 2, y_offset))
+
+    combined_img.save(os.path.join('results/ssim_checkpoints', f'comparison_{img_id}.png'))
+
+def black_white(y_true, y_pred):
+    global global_img_id
+
+    # # Imprimir valores originales de y_true y y_pred antes de la normalización
+    # print(f'Valores originales de y_true: min {np.min(y_true)}, max {np.max(y_true)}')
+    # print(f'Valores originales de y_pred: min {np.min(y_pred)}, max {np.max(y_pred)}')
+
+    # Si y_true y y_pred ya están normalizados, no es necesario volver a normalizarlos
+    y_true = y_true  # Asumiendo que ya están en el rango [0, 1]
+    y_pred_normalized = y_pred  # Asumiendo que ya están en el rango [0, 1]
+
+    # # Verificar los valores después de la normalización
+    # print(f'Valores de y_true después de la normalización: min {np.min(y_true)}, max {np.max(y_true)}')
+    # print(f'Valores de y_pred_normalized después de la normalización: min {np.min(y_pred_normalized)}, max {np.max(y_pred_normalized)}')
+
+    # Aplicar umbralización invertida
+    threshold = (np.min(y_pred_normalized) + np.max(y_pred_normalized)) / 2  # Umbral dinámico
+    y_pred_threshold = np.where(y_pred_normalized < threshold, 0, 1)
+
+    # # Verificar los valores después de la umbralización
+    # print(f'Valores de y_pred_threshold después de la umbralización: min {np.min(y_pred_threshold)}, max {np.max(y_pred_threshold)}')
+
+    # Guardar las imágenes para comparar
+    save_images(y_true, y_pred_normalized, y_pred_threshold, global_img_id)
+    global_img_id += 1
+
+    return y_true.astype(np.float32), y_pred_threshold.astype(np.float32)
+
+
+
 
 
 def create_model(input_shape, architecture, num_layers=3):
@@ -512,6 +577,7 @@ def residual_conv_lstm_par(input_shape, num_layers, num_filters_list, dropout_ra
 
 
 def architecture_conv_lstm(input_shape, num_layers, scaling_factor=1.0):
+    print("++++ architecture_conv_lstm ++++  numlayers", num_layers, "input_shape", input_shape)
     """
     Combined Architecture: Multiple ConvLSTM2D layers followed by Conv3D layers.
 
@@ -525,27 +591,36 @@ def architecture_conv_lstm(input_shape, num_layers, scaling_factor=1.0):
     inp = Input(shape=(None, *input_shape))
     x = inp
 
-    for i in range(num_layers):
+    for i in range(num_layers - 1):
         x = ConvLSTM2D(
             filters=64,
             kernel_size=(3, 3),
             padding="same",
             return_sequences=True,
             activation="relu",
-            # dropout=0.3,
-            # recurrent_dropout=0.3, 
             name=f"conv_lstm2d_{i+1}"
         )(x)
-        # x = BatchNormalization()(x)
 
+    x = ConvLSTM2D(
+        filters=64,
+        kernel_size=(3, 3),
+        padding="same",
+        return_sequences=False,
+        activation="relu",
+        name=f"conv_lstm2d_{num_layers}"
+    )(x)
+
+    # Añadir una capa Conv3D al final para reducir la dimensión temporal a 1
+    x = tf.expand_dims(x, axis=1)  # Añadir dimensión temporal
+    print(f'Shape before Conv3D: {x.shape}')
     x = Conv3D(
         filters=input_shape[-1],
-        kernel_size=(3, 3, 3),
+        kernel_size=(1, 3, 3),
         activation="sigmoid",
         padding="same",
     )(x)
+    print(f'Shape after Conv3D: {x.shape}')
 
-    # Aplicar weight scaling a la última capa
     x = Lambda(scale_weights, arguments={'scale': scaling_factor})(x)
 
     model = Model(inp, x)

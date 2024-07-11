@@ -454,7 +454,7 @@ def main():
     p.add_argument('-m', '--m', type=int, default=0, help="The model architecture. 0: ConvLSTM, 1: Bi-directional ConvLSTM and U-Net")
     p.add_argument('--layers', type=int, default=5, help="The number of hidden layers")
     p.add_argument('--ts', type=float, default=.15, help='the test split percentage')
-    p.add_argument('-bz', '--bz', type=int, default=32, help='the GPU batch size')
+    p.add_argument('-bz', '--bz', type=int, default=6, help='the GPU batch size')
     p.add_argument('-e', '--epochs', type=int, default=50, help='the deep learning epochs')
     p.add_argument('-pa', '--patience', type=int, default=10, help='the patience hyperparameter')
     p.add_argument('--w', type=int, default=64, help='the width')
