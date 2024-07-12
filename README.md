@@ -3,9 +3,9 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8130984.svg)](https://doi.org/10.5281/zenodo.8130984)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) <img src="https://img.shields.io/github/release/frangam/wound-healing.svg"/> [![GitHub all releases](https://img.shields.io/github/downloads/frangam/wound-healing/total)](https://github.com/frangam/wound-healing/releases/download/1.0/wound-healing-v1.0.zip)
 
-Software for Predicting the Dynamic Evolution of Tumor Migration with Artificial Intelligence in Wound Healing Assays.
+This is the official implementation code of the paper <b>"Using Deep Learning for Predicting the Dynamic Evolution of Breast Cancer Migration"</b> ([`Paper`](https://authors.elsevier.com/tracking/article/details.do?aid=108890&jid=CBM&surname=Garcia-Moreno))
 
-[[`Paper`](https://authors.elsevier.com/tracking/article/details.do?aid=108890&jid=CBM&surname=Garcia-Moreno))] [[`Dataset`](https://doi.org/10.5281/zenodo.8131123)] [[`BibTeX`](#citation)]
+[[`Paper`](https://authors.elsevier.com/tracking/article/details.do?aid=108890&jid=CBM&surname=Garcia-Moreno)] [[`Dataset`](https://doi.org/10.5281/zenodo.8131123)] [[`BibTeX`](#citation)]
 
 ## Model architectures
 <p float="left">
