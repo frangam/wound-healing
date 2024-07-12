@@ -431,14 +431,13 @@ def main():
     Example of runs:
     -synthetic images:
     ./nextimage.py --epochs 10 --type synth_monolayer --prefix synthetic
-    ./nextimage.py --bz 4 --patience 30 --epochs 300 --start-frame 3 --frames-pred 4 --m 9 --gpu-id 3
+    ./nextimage.py --bz 6 --patience 30 --epochs 300 --start-frame 3 --frames-pred 4 --m 9 --gpu-id 3
 
 
     ./nextimage.py --just-predict
 
     - real images:
-    ./nextimage.py --bz 4 --patience 30 --epochs 300 --fine-tune --type real_monolayer --prefix real --start-frame 3 --frames-pred 4 --m 9 --gpu-id 3
-
+    ./nextimage.py -m 3 -c -bz 6 -pa 30 -e 1000 --gpu-id 3 -p real -f
 
 
     '''
