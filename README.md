@@ -84,12 +84,15 @@ We use a combination of [Meta's Segment Anything model](https://github.com/faceb
 If you use our code in your research, please use the following BibTeX entry:
 
 ```
-@misc{Garcia-Moreno-PWPF,
-  title={Using Deep Learning for Predicting the Dynamic Evolution of Breast Cancer Migration,
-  author={Garcia-Moreno, Francisco Manuel and Ruiz-Espigares, Jesus and Marchal, Juan Antonio and Gutierrez-Naranjo, Miguel Angel},
-  year={2024},
-  doi={}
+@article{Garcia-Moreno-PWPF,
+  title={Using Deep Learning for Predicting the Dynamic Evolution of Breast Cancer Migration},
+  author={Garcia-Moreno, Francisco Manuel and Ruiz-Espigares, Jesus and Marchal, Juan Antonio and Gutierrez-Naranjo, Miguel Angel},
+  year={2024},
+  journal={Computers in Biology and Medicine},
+  doi={pending},
+  note={\url{https://authors.elsevier.com/tracking/article/details.do?aid=108890&jid=CBM&surname=Garcia-Moreno}}
 }
+
 ```
 
 And also cite our MCF-7 Dataset used to train our software:
