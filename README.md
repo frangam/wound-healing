@@ -5,7 +5,7 @@
 
 Software for Predicting the Dynamic Evolution of Tumor Migration with Artificial Intelligence in Wound Healing Assays.
 
-[[`Paper`]Coming Soon] [[`Dataset`](https://doi.org/10.5281/zenodo.8131123)] [[`BibTeX`](#citation)]
+[[`Paper`](https://authors.elsevier.com/tracking/article/details.do?aid=108890&jid=CBM&surname=Garcia-Moreno))] [[`Dataset`](https://doi.org/10.5281/zenodo.8131123)] [[`BibTeX`](#citation)]
 
 ## Model architectures
 <p float="left">
