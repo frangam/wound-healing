@@ -301,6 +301,24 @@ def create_shifted_frames(data, labels):
     Returns:
     Tuple[np.array, np.array, np.array, np.array]: The input data (x), the target shifted frames (y),
                                                    the sequence IDs (ids), and the labels for each shifted frame.
+    
+    Example:
+    If the input data has sequences of 8 frames, this function will generate the following pairs:
+
+    Original Sequence:
+    Sequence 1: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6, Frame7, Frame8]
+
+    Generated Pairs:
+    x: [Frame1, 0, 0, 0, 0, 0, 0]                       -> y: [Frame2]
+    x: [Frame1, Frame2, 0, 0, 0, 0, 0]                  -> y: [Frame3]
+    x: [Frame1, Frame2, Frame3, 0, 0, 0]                -> y: [Frame4]
+    x: [Frame1, Frame2, Frame3, Frame4, 0, 0]           -> y: [Frame5]
+    x: [Frame1, Frame2, Frame3, Frame4, Frame5, 0]      -> y: [Frame6]
+    x: [Frame1, Frame2, Frame3, Frame4, Frame5, Frame6] -> y: [Frame7]
+
+    shape of x: (:, 6); shape of y: (:, 1)
+
+    This allows the model to learn to predict the next frame given any number of previous frames in the sequence.
     """
     num_sequences, sequence_length, height, width, channels = data.shape
     x = []
