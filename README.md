@@ -1,7 +1,7 @@
 # Using Deep Learning for Predicting the Dynamic Evolution of Breast Cancer Migration (Wound Healing Assays Prediction)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8130984.svg)](https://doi.org/10.5281/zenodo.8130984)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) <img src="https://img.shields.io/github/release/frangam/wound-healing.svg"/> [![GitHub all releases](https://img.shields.io/github/downloads/frangam/wound-healing/total)](https://github.com/frangam/wound-healing/releases/download/1.0/wound-healing-v1.0.zip)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) <img src="https://img.shields.io/github/release/frangam/wound-healing.svg"/> [![GitHub all releases](https://img.shields.io/github/downloads/frangam/wound-healing/total)](https://github.com/frangam/wound-healing/releases/download/1.1/wound-healing-v1.1.zip)
 
 This is the official implementation code of the paper <b>"Using Deep Learning for Predicting the Dynamic Evolution of Breast Cancer Migration"</b> ([`Paper`](https://authors.elsevier.com/tracking/article/details.do?aid=108890&jid=CBM&surname=Garcia-Moreno))
 
@@ -18,7 +18,7 @@ This is the official implementation code of the paper <b>"Using Deep Learning fo
 ## Download last release
 Support us downloading our last release
 
-- Click on this button to download [![GitHub all releases](https://img.shields.io/github/downloads/frangam/wound-healing/total)](https://github.com/frangam/wound-healing/releases/download/1.0/wound-healing-v1.0.zip)
+- Click on this button to download [![GitHub all releases](https://img.shields.io/github/downloads/frangam/wound-healing/total)](https://github.com/frangam/wound-healing/releases/download/1.1/wound-healing-v1.1.zip)
 - We also appreciate your support downloading it on ZENODO site: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8130984.svg)](https://doi.org/10.5281/zenodo.8130984)
 
 
