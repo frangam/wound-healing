@@ -98,9 +98,9 @@ If you use our code in your research, please use the following BibTeX entry:
 And also cite our MCF-7 Dataset used to train our software:
 
 ```
-@misc{Ruiz-EspigaresMCF7,
-  title={Evolution of CSCs and non CSCs MCF-7 Migration in Wound Healing Assay},
-  author={Ruiz-Espigares, Jesus and Garcia-Moreno, Francisco Manuel},
+@misc{{WHiM-BC,
+  title={WHiM-BC Dataset: Evolution of CSCs and non CSCs MCF-7 Migration in Wound Healing Assay},
+  author={Garcia-Moreno, Francisco Manuel and Ruiz-Espigares, Jesus},
   year={2023},
   doi={10.5281/zenodo.8131123},
   url={https://doi.org/10.5281/zenodo.8131123},
